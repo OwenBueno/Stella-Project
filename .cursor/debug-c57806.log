@@ -1,0 +1,2 @@
+{"sessionId":"c57806","runId":"pre-fix","hypothesisId":"B","location":"prisma.service.ts:onModuleInit","message":"before $connect","data":{"hasDatabaseUrl":true},"timestamp":1779126574697}
+{"sessionId":"c57806","runId":"pre-fix","hypothesisId":"B","location":"prisma.service.ts:onModuleInit","message":"after $connect","data":{"connected":true},"timestamp":1779126574721}

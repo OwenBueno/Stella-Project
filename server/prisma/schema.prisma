@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Habit {
+  id        String    @id @map("_id")
+  name      String
+  sortOrder Int
+  active    Boolean   @default(true)
+  createdAt DateTime
+  updatedAt DateTime
+  deletedAt DateTime?
+}
+
+model HabitCheckIn {
+  id        String   @id @map("_id")
+  habitId   String
+  date      String
+  status    String
+  updatedAt DateTime
+
+  @@index([habitId, date])
+}
+
+model Task {
+  id              String    @id @map("_id")
+  title           String
+  notes           String?
+  scheduledAt     DateTime?
+  durationMinutes Int?
+  status          String
+  priority        String?
+  createdAt       DateTime
+  updatedAt       DateTime
+  deletedAt       DateTime?
+}
+
+model CalendarEvent {
+  id           String    @id @map("_id")
+  title        String
+  startAt      DateTime
+  endAt        DateTime
+  linkedTaskId String?
+  createdAt    DateTime
+  updatedAt    DateTime
+  deletedAt    DateTime?
+}
+
+model DailyIntent {
+  id           String   @id @map("_id")
+  date         String   @unique
+  top3TaskIds  String[]
+  completedAt  DateTime
+  nfcTagId     String
+  updatedAt    DateTime
+}
+
+model EveningReview {
+  id                  String @id @map("_id")
+  date                String @unique
+  plannedVsActual     String?
+  reflectionText      String?
+  habitGridSnapshot   Json
+  completedAt         DateTime
+  updatedAt           DateTime
+}
+
+model LifeLog {
+  id        String   @id @map("_id")
+  type      String
+  payload   Json
+  timestamp DateTime
+  updatedAt DateTime
+}
+
+model DeviceToken {
+  id        String   @id @map("_id")
+  deviceId  String   @unique
+  fcmToken  String
+  updatedAt DateTime
+}
