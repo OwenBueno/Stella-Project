@@ -1,0 +1,25 @@
+# Environment
+.env
+server/.env
+
+# Node
+server/node_modules/
+server/dist/
+
+# Android
+Stella/**/build/
+Stella/.gradle/
+Stella/local.properties
+*.apk
+*.aab
+
+# IDE
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+browser-design
+.cursor/debug*

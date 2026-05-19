@@ -53,10 +53,12 @@ com.stella/
 │   │   └── data/
 │   ├── tasks/
 │   ├── calendar/
-│   ├── morning/
-│   ├── focus/
-│   ├── evening/
-│   └── enforcement/
+│   ├── morning/                   # MorningLockActivity
+│   ├── dailyintent/               # DailyIntentActivity (Top 3 + blocks)
+│   ├── nfc/                       # NfcEnrollmentActivity
+│   ├── review/                    # Evening review (ReviewScreen)
+│   ├── focus/                     # Phase 3
+│   └── enforcement/               # Phase 3
 └── sync/
     ├── SyncWorker.kt
     └── SyncRepository.kt
@@ -115,7 +117,8 @@ Single `MainActivity` hosts `StellaNavHost`:
 | `tasks` | Task list |
 | `tasks/{id}` | Task detail |
 | `calendar` | Day view |
-| `settings` | Permissions, API key, NFC enrollment |
+| `review` | Evening review form + habit snapshot |
+| `settings` | API key, NFC enrollment, evening reminder time |
 
 Enforcement screens (morning lock, task takeover) may use separate `Activity` entries for full-screen/intent reliability — see [../android/permissions-and-apis.md](../android/permissions-and-apis.md).
 
@@ -133,7 +136,7 @@ Enforcement screens (morning lock, task takeover) may use separate `Activity` en
 | Phase | Components |
 |-------|------------|
 | 1 | Room, NavHost, Habits/Tasks/Calendar MVI, SyncWorker |
-| 2 | `MorningLockActivity`, NFC dispatch, `DailyIntentScreen`, `EveningReviewScreen` |
+| 2 | `MorningLockActivity`, `DailyIntentActivity`, `NfcEnrollmentActivity`, `ReviewScreen`, `LifeLogWriter`, `EveningReviewScheduler` |
 | 3 | `TaskTakeoverActivity`, `AlarmReceiver`, `FocusForegroundService`, FCM service |
 
 ## Testing strategy

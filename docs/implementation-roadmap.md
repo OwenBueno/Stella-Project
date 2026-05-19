@@ -24,21 +24,21 @@ Phased delivery with **exit gates**. Do not start the next phase until the curre
 
 ### Server tasks
 
-- [ ] NestJS project in `server/` with `ApiKeyGuard`
-- [ ] Prisma schema + MongoDB Atlas connection
-- [ ] Modules: `habits`, `tasks`, `calendar`, `sync`
-- [ ] CRUD endpoints per [api/rest-api.md](api/rest-api.md)
+- [x] NestJS project in `server/` with `ApiKeyGuard`
+- [x] Mongoose schemas + MongoDB connection
+- [x] Modules: `habits`, `tasks`, `calendar`, `sync`
+- [x] CRUD endpoints per [api/rest-api.md](api/rest-api.md)
 - [ ] Deploy to GCP VM (or local Docker for dev)
 
 ### Android tasks
 
-- [ ] `minSdk = 31`, package `com.stella`
-- [ ] Hilt, Room, Navigation Compose
-- [ ] `StellaTheme` with design tokens
-- [ ] Feature modules: `habits`, `tasks`, `calendar` (MVI slices)
-- [ ] `HabitGrid` composable
-- [ ] `SyncWorker` + Retrofit client
-- [ ] Settings: API URL + key
+- [x] `minSdk = 31`, package `com.stella`
+- [x] Hilt, Room, Navigation Compose
+- [x] `StellaTheme` with design tokens
+- [x] Feature modules: `habits`, `tasks`, `calendar` (MVI slices)
+- [x] `HabitGrid` composable
+- [x] `SyncWorker` + Retrofit client
+- [x] Settings: API URL + key
 
 ### Exit gate
 
@@ -61,18 +61,18 @@ Phased delivery with **exit gates**. Do not start the next phase until the curre
 
 ### Server tasks
 
-- [ ] `daily-intents` module
-- [ ] `evening-reviews` module
-- [ ] `life-logs` append API (or via sync only)
+- [x] `daily-intents` module
+- [x] `evening-reviews` module
+- [x] `life-logs` via sync only (no standalone CRUD)
 
 ### Android tasks
 
-- [ ] Overlay permission onboarding
-- [ ] `MorningLockActivity` + boot/alarm receiver
-- [ ] NFC enrollment + verification in Settings
-- [ ] `DailyIntentScreen` with Top 3 + calendar blocks
-- [ ] `EveningReviewScreen` + local notification trigger
-- [ ] `LifeLog` writes on unlock and review
+- [ ] Overlay permission onboarding (deferred — Phase 2 uses first-open day gate, not overlay)
+- [x] `MorningLockActivity` + evening review WorkManager reminder
+- [x] NFC enrollment + verification in Settings
+- [x] `DailyIntentActivity` with Top 3 + calendar blocks
+- [x] `ReviewScreen` evening review form + local notification trigger
+- [x] `LifeLog` writes on unlock and review
 
 ### Exit gate
 
@@ -139,7 +139,7 @@ Phased delivery with **exit gates**. Do not start the next phase until the curre
 
 | Day | Focus |
 |-----|-------|
-| Mon–Tue | Server scaffold, Prisma, habits API |
+| Mon–Tue | Server scaffold, Mongoose, habits API |
 | Wed–Thu | Android Hilt/Room/Nav, theme, habits MVI |
 | Fri | HabitGrid UI, habit check-ins |
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted (amended — ORM is Mongoose; see [007-mongoose-orm.md](007-mongoose-orm.md))
 
 ## Context
 
@@ -12,8 +12,8 @@ Stella stores flexible `LifeLog.payload` documents and may evolve evening review
 
 ## Decision
 
-- Database: **MongoDB Atlas**
-- ORM: **Prisma** with MongoDB provider
+- Database: **MongoDB Atlas** (or local standalone MongoDB for dev)
+- ORM: **Mongoose** + `@nestjs/mongoose` (supersedes Prisma — [ADR 007](007-mongoose-orm.md))
 - Entity ids: **String UUID** (not ObjectId) for alignment with Android client
 
 ## Consequences
@@ -22,15 +22,15 @@ Stella stores flexible `LifeLog.payload` documents and may evolve evening review
 
 - Atlas handles backups, scaling, and ops for solo developer
 - Document model fits `LifeLog` and embedded snapshots
-- Prisma keeps type safety in NestJS
+- Mongoose works on standalone MongoDB without replica-set workarounds
 
 **Negative**
 
 - No relational joins; application enforces references
-- Prisma MongoDB feature set differs from SQL (no migrations in same way — use `db push` carefully)
+- Index changes require `syncIndexes()` or manual Atlas index management
 - Original docs referencing PostgreSQL are obsolete
 
 ## Alternatives considered
 
 - **PostgreSQL on Atlas or VM:** Rejected per operator preference
-- **Mongoose without Prisma:** Rejected; Prisma + NestJS TypeScript synergy
+- **Prisma with MongoDB:** Used initially; replaced due to P2031 on standalone dev ([ADR 007](007-mongoose-orm.md))

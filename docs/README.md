@@ -9,7 +9,7 @@ Stella is a solo-use aggressive Life OS: habit grid, internal calendar, morning 
 | [summary.md](summary.md) | Executive summary (product + stack overview) |
 | [stack.md](stack.md) | Technology choices and conventions |
 | [implementation-roadmap.md](implementation-roadmap.md) | Phased delivery plan with exit gates |
-| [data-model.md](data-model.md) | Entities, Room/Prisma mapping, sync fields |
+| [data-model.md](data-model.md) | Entities, Room/Mongoose mapping, sync fields |
 | [deployment.md](deployment.md) | GCP VM, MongoDB Atlas, secrets |
 
 ## Architecture
@@ -59,6 +59,7 @@ Stella is a solo-use aggressive Life OS: habit grid, internal calendar, morning 
 Stella-Project/
 ├── Stella/          # Android app (Kotlin, Compose, MVI)
 ├── server/          # NestJS API
+├── browser-design/  # UI prototype reference (React; not shipped)
 ├── docs/            # This directory
 ├── infra/           # Docker, nginx (deployment)
 └── README.md        # Project quick start

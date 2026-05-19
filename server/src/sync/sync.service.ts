@@ -1,0 +1,326 @@
+import { ConflictException, Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { mapDoc, mapDocs } from '../database/document.util';
+import { CalendarEvent, CalendarEventDocument } from '../database/schemas/calendar-event.schema';
+import { DailyIntent, DailyIntentDocument } from '../database/schemas/daily-intent.schema';
+import { EveningReview, EveningReviewDocument } from '../database/schemas/evening-review.schema';
+import { Habit, HabitDocument } from '../database/schemas/habit.schema';
+import { HabitCheckIn, HabitCheckInDocument } from '../database/schemas/habit-check-in.schema';
+import { LifeLog, LifeLogDocument } from '../database/schemas/life-log.schema';
+import { Task, TaskDocument } from '../database/schemas/task.schema';
+import { isIncomingNewer } from '../common/sync/lww.util';
+import {
+  SyncCheckInDto,
+  SyncDailyIntentDto,
+  SyncEventDto,
+  SyncEveningReviewDto,
+  SyncHabitDto,
+  SyncLifeLogDto,
+  SyncPushDto,
+  SyncTaskDto,
+} from './dto/sync-push.dto';
+
+@Injectable()
+export class SyncService {
+  constructor(
+    @InjectModel(Habit.name) private readonly habitModel: Model<HabitDocument>,
+    @InjectModel(HabitCheckIn.name)
+    private readonly checkInModel: Model<HabitCheckInDocument>,
+    @InjectModel(Task.name) private readonly taskModel: Model<TaskDocument>,
+    @InjectModel(CalendarEvent.name)
+    private readonly eventModel: Model<CalendarEventDocument>,
+    @InjectModel(DailyIntent.name)
+    private readonly dailyIntentModel: Model<DailyIntentDocument>,
+    @InjectModel(EveningReview.name)
+    private readonly eveningReviewModel: Model<EveningReviewDocument>,
+    @InjectModel(LifeLog.name) private readonly lifeLogModel: Model<LifeLogDocument>,
+  ) {}
+
+  async push(dto: SyncPushDto) {
+    let accepted = 0;
+    const conflicts: Array<{
+      entity: string;
+      id: string;
+      serverDocument: unknown;
+    }> = [];
+
+    for (const habit of dto.habits) {
+      const result = await this.upsertHabit(habit);
+      if (result === 'accepted') accepted++;
+      else if (result.conflict) conflicts.push(result.conflict);
+    }
+
+    for (const checkIn of dto.habitCheckIns) {
+      await this.upsertCheckIn(checkIn);
+      accepted++;
+    }
+
+    for (const task of dto.tasks) {
+      const result = await this.upsertTask(task);
+      if (result === 'accepted') accepted++;
+      else if (result.conflict) conflicts.push(result.conflict);
+    }
+
+    for (const event of dto.events) {
+      const result = await this.upsertEvent(event);
+      if (result === 'accepted') accepted++;
+      else if (result.conflict) conflicts.push(result.conflict);
+    }
+
+    for (const intent of dto.dailyIntents ?? []) {
+      const result = await this.upsertDailyIntent(intent);
+      if (result === 'accepted') accepted++;
+      else if (result.conflict) conflicts.push(result.conflict);
+    }
+
+    for (const review of dto.eveningReviews ?? []) {
+      const result = await this.upsertEveningReview(review);
+      if (result === 'accepted') accepted++;
+      else if (result.conflict) conflicts.push(result.conflict);
+    }
+
+    for (const log of dto.lifeLogs ?? []) {
+      const result = await this.upsertLifeLog(log);
+      if (result === 'accepted') accepted++;
+      else if (result.conflict) conflicts.push(result.conflict);
+    }
+
+    return { accepted, conflicts };
+  }
+
+  async pull(since?: string) {
+    const sinceDate = since ? new Date(since) : new Date(0);
+    const serverTime = new Date().toISOString();
+    const filter = { updatedAt: { $gt: sinceDate } };
+
+    const [habits, habitCheckIns, tasks, events, dailyIntents, eveningReviews, lifeLogs] =
+      await Promise.all([
+        this.habitModel.find(filter).exec(),
+        this.checkInModel.find(filter).exec(),
+        this.taskModel.find(filter).exec(),
+        this.eventModel.find(filter).exec(),
+        this.dailyIntentModel.find(filter).exec(),
+        this.eveningReviewModel.find(filter).exec(),
+        this.lifeLogModel.find(filter).exec(),
+      ]);
+
+    return {
+      serverTime,
+      habits: mapDocs(habits),
+      habitCheckIns: mapDocs(habitCheckIns),
+      tasks: mapDocs(tasks),
+      events: mapDocs(events),
+      dailyIntents: mapDocs(dailyIntents),
+      eveningReviews: mapDocs(eveningReviews),
+      lifeLogs: mapDocs(lifeLogs),
+    };
+  }
+
+  private async upsertHabit(
+    dto: SyncHabitDto,
+  ): Promise<'accepted' | { conflict: { entity: string; id: string; serverDocument: unknown } }> {
+    const existing = await this.habitModel.findById(dto.id).exec();
+    if (existing && !isIncomingNewer(dto.updatedAt, existing.updatedAt)) {
+      return {
+        conflict: { entity: 'habit', id: dto.id, serverDocument: mapDoc(existing) },
+      };
+    }
+
+    const data = {
+      name: dto.name,
+      sortOrder: dto.sortOrder,
+      active: dto.active,
+      updatedAt: new Date(dto.updatedAt),
+      deletedAt: dto.deletedAt ? new Date(dto.deletedAt) : null,
+    };
+
+    if (existing) {
+      await this.habitModel.updateOne({ _id: dto.id }, data).exec();
+    } else {
+      await this.habitModel.create({
+        _id: dto.id,
+        ...data,
+        createdAt: new Date(dto.createdAt),
+      });
+    }
+    return 'accepted';
+  }
+
+  private async upsertCheckIn(dto: SyncCheckInDto) {
+    const existing = await this.checkInModel
+      .findOne({ habitId: dto.habitId, date: dto.date })
+      .exec();
+    if (existing && !isIncomingNewer(dto.updatedAt, existing.updatedAt)) {
+      throw new ConflictException({
+        code: 'SYNC_CONFLICT',
+        message: 'Check-in conflict',
+        serverDocument: mapDoc(existing),
+      });
+    }
+    if (existing) {
+      await this.checkInModel
+        .updateOne(
+          { _id: existing._id },
+          { status: dto.status, updatedAt: new Date(dto.updatedAt) },
+        )
+        .exec();
+    } else {
+      await this.checkInModel.create({
+        _id: dto.id,
+        habitId: dto.habitId,
+        date: dto.date,
+        status: dto.status,
+        updatedAt: new Date(dto.updatedAt),
+      });
+    }
+  }
+
+  private async upsertTask(
+    dto: SyncTaskDto,
+  ): Promise<'accepted' | { conflict: { entity: string; id: string; serverDocument: unknown } }> {
+    const existing = await this.taskModel.findById(dto.id).exec();
+    if (existing && !isIncomingNewer(dto.updatedAt, existing.updatedAt)) {
+      return {
+        conflict: { entity: 'task', id: dto.id, serverDocument: mapDoc(existing) },
+      };
+    }
+
+    const data = {
+      title: dto.title,
+      notes: dto.notes ?? null,
+      scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
+      durationMinutes: dto.durationMinutes ?? null,
+      status: dto.status,
+      priority: dto.priority ?? null,
+      updatedAt: new Date(dto.updatedAt),
+      deletedAt: dto.deletedAt ? new Date(dto.deletedAt) : null,
+    };
+
+    if (existing) {
+      await this.taskModel.updateOne({ _id: dto.id }, data).exec();
+    } else {
+      await this.taskModel.create({
+        _id: dto.id,
+        ...data,
+        createdAt: new Date(dto.createdAt),
+      });
+    }
+    return 'accepted';
+  }
+
+  private async upsertEvent(
+    dto: SyncEventDto,
+  ): Promise<'accepted' | { conflict: { entity: string; id: string; serverDocument: unknown } }> {
+    const existing = await this.eventModel.findById(dto.id).exec();
+    if (existing && !isIncomingNewer(dto.updatedAt, existing.updatedAt)) {
+      return {
+        conflict: { entity: 'event', id: dto.id, serverDocument: mapDoc(existing) },
+      };
+    }
+
+    const data = {
+      title: dto.title,
+      startAt: new Date(dto.startAt),
+      endAt: new Date(dto.endAt),
+      linkedTaskId: dto.linkedTaskId ?? null,
+      updatedAt: new Date(dto.updatedAt),
+      deletedAt: dto.deletedAt ? new Date(dto.deletedAt) : null,
+    };
+
+    if (existing) {
+      await this.eventModel.updateOne({ _id: dto.id }, data).exec();
+    } else {
+      await this.eventModel.create({
+        _id: dto.id,
+        ...data,
+        createdAt: new Date(dto.createdAt),
+      });
+    }
+    return 'accepted';
+  }
+
+  private async upsertDailyIntent(
+    dto: SyncDailyIntentDto,
+  ): Promise<'accepted' | { conflict: { entity: string; id: string; serverDocument: unknown } }> {
+    const existing = await this.dailyIntentModel.findOne({ date: dto.date }).exec();
+    if (existing && !isIncomingNewer(dto.updatedAt, existing.updatedAt)) {
+      return {
+        conflict: {
+          entity: 'dailyIntent',
+          id: dto.id,
+          serverDocument: mapDoc(existing),
+        },
+      };
+    }
+
+    const data = {
+      top3TaskIds: dto.top3TaskIds,
+      completedAt: new Date(dto.completedAt),
+      nfcTagId: dto.nfcTagId,
+      updatedAt: new Date(dto.updatedAt),
+    };
+
+    if (existing) {
+      await this.dailyIntentModel.updateOne({ date: dto.date }, data).exec();
+    } else {
+      await this.dailyIntentModel.create({ _id: dto.id, date: dto.date, ...data });
+    }
+    return 'accepted';
+  }
+
+  private async upsertEveningReview(
+    dto: SyncEveningReviewDto,
+  ): Promise<'accepted' | { conflict: { entity: string; id: string; serverDocument: unknown } }> {
+    const existing = await this.eveningReviewModel.findOne({ date: dto.date }).exec();
+    if (existing && !isIncomingNewer(dto.updatedAt, existing.updatedAt)) {
+      return {
+        conflict: {
+          entity: 'eveningReview',
+          id: dto.id,
+          serverDocument: mapDoc(existing),
+        },
+      };
+    }
+
+    const data = {
+      plannedVsActual: dto.plannedVsActual ?? null,
+      reflectionText: dto.reflectionText ?? null,
+      habitGridSnapshot: JSON.parse(dto.habitGridSnapshot) as Record<string, unknown>,
+      completedAt: new Date(dto.completedAt),
+      updatedAt: new Date(dto.updatedAt),
+    };
+
+    if (existing) {
+      await this.eveningReviewModel.updateOne({ date: dto.date }, data).exec();
+    } else {
+      await this.eveningReviewModel.create({ _id: dto.id, date: dto.date, ...data });
+    }
+    return 'accepted';
+  }
+
+  private async upsertLifeLog(
+    dto: SyncLifeLogDto,
+  ): Promise<'accepted' | { conflict: { entity: string; id: string; serverDocument: unknown } }> {
+    const existing = await this.lifeLogModel.findById(dto.id).exec();
+    if (existing && !isIncomingNewer(dto.updatedAt, existing.updatedAt)) {
+      return {
+        conflict: { entity: 'lifeLog', id: dto.id, serverDocument: mapDoc(existing) },
+      };
+    }
+
+    const data = {
+      type: dto.type,
+      payload: JSON.parse(dto.payload) as Record<string, unknown>,
+      timestamp: new Date(dto.timestamp),
+      updatedAt: new Date(dto.updatedAt),
+    };
+
+    if (existing) {
+      await this.lifeLogModel.updateOne({ _id: dto.id }, data).exec();
+    } else {
+      await this.lifeLogModel.create({ _id: dto.id, ...data });
+    }
+    return 'accepted';
+  }
+}

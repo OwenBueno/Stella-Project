@@ -1,0 +1,10 @@
+{
+  "name": "Stella",
+  "description": "An uncompromising, aggressive productivity and accountability assistant designed to eliminate procrastination and enforce daily planning.",
+  "requestFramePermissions": [
+    "notifications"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -29,7 +29,7 @@ Eliminate morning procrastination, enforce daily planning, and prevent critical 
 |-------|--------|
 | **Android** | Kotlin, Jetpack Compose, **MVI**, Hilt, Room, minSdk **31** |
 | **Backend** | NestJS (TypeScript) on **GCP VM** |
-| **Database** | **MongoDB Atlas** via Prisma (MongoDB provider) |
+| **Database** | **MongoDB Atlas** via Mongoose (`@nestjs/mongoose`) |
 | **Auth (solo)** | Static API key (`X-Api-Key`) |
 | **Push (Phase 3)** | Firebase Cloud Messaging |
 | **AI (later)** | OpenAI via Nest cron for evening coaching |
@@ -39,7 +39,7 @@ Calendar is **Stella-owned only** (no Google Calendar sync in v1). Financial pen
 ## 5. Architecture (high level)
 
 - **Android:** Clean Architecture + MVI; offline-first Room; sync to server.
-- **Server:** NestJS modules per domain; Prisma repositories; API key guard.
+- **Server:** NestJS modules per domain; Mongoose models; API key guard.
 - **Sync:** Client-generated UUIDs; last-write-wins by `updatedAt`.
 
 See [architecture/overview.md](architecture/overview.md).

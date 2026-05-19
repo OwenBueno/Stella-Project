@@ -1,6 +1,6 @@
 # Backend Architecture
 
-NestJS API deployed on a GCP VM, persisting to MongoDB Atlas via Prisma.
+NestJS API deployed on a GCP VM, persisting to MongoDB via Mongoose.
 
 ## Module layout
 
@@ -8,28 +8,27 @@ NestJS API deployed on a GCP VM, persisting to MongoDB Atlas via Prisma.
 server/src/
 ├── main.ts
 ├── app.module.ts
+├── database/
+│   ├── database.module.ts       # MongooseModule.forRootAsync
+│   ├── schemas/                 # 8 document schemas
+│   ├── document.util.ts         # _id → id JSON mapping
+│   └── index-sync.service.ts    # syncIndexes on boot
 ├── common/
 │   ├── guards/api-key.guard.ts
-│   ├── filters/http-exception.filter.ts
-│   └── prisma/
-│       └── prisma.service.ts
+│   └── filters/http-exception.filter.ts
 ├── habits/
 │   ├── habits.module.ts
 │   ├── habits.controller.ts
-│   ├── habits.service.ts
-│   └── habits.repository.ts
+│   └── habits.service.ts
 ├── tasks/
-├── calendar/
-│   ├── calendar.module.ts        # events CRUD
-│   └── ...
-├── life-logs/
+├── calendar/                      # events CRUD
 ├── sync/
 │   ├── sync.controller.ts
 │   └── sync.service.ts
-├── daily-intents/                # Phase 2
-├── evening-reviews/              # Phase 2
-├── notifications/                # Phase 3 — FCM
-└── ai/                           # later — OpenAI cron
+├── daily-intents/                 # POST + GET by date
+├── evening-reviews/               # POST + GET by date
+├── notifications/                 # Phase 3 — FCM
+└── ai/                            # later — OpenAI cron
 ```
 
 ## Layering (per module)
@@ -37,18 +36,17 @@ server/src/
 ```mermaid
 flowchart TB
   Controller --> Service
-  Service --> Repository
-  Repository --> Prisma
+  Service --> Model[Mongoose Model]
+  Model --> MongoDB[(MongoDB)]
 ```
 
 | Layer | Role |
 |-------|------|
 | **Controller** | HTTP mapping, DTO validation (`class-validator`), status codes |
-| **Service** | Business rules, orchestration (use case) |
-| **Repository** | Prisma queries, mapping to domain types |
-| **Prisma** | Generated client from `schema.prisma` |
+| **Service** | Business rules, orchestration; injects `@InjectModel()` |
+| **Mongoose model** | Queries, indexes, schema definitions |
 
-Controllers stay thin; no Prisma calls in controllers.
+Controllers stay thin; no direct MongoDB calls in controllers.
 
 ## Global concerns
 
@@ -86,11 +84,12 @@ Map Nest `HttpException` through a global filter for consistent shape.
 | `notifications` | 3 | FCM send, device token store |
 | `ai` | later | Cron → OpenAI → notification |
 
-## Prisma + MongoDB
+## Mongoose + MongoDB
 
-- Single database, collections per model in `schema.prisma`
-- Use `@db.ObjectId` or `String @id` with UUID — **prefer String UUID** matching Android client ids for simpler sync
-- Index on `updatedAt` for sync pull queries
+- Single database; collection names match prior Prisma defaults (`Habit`, `Task`, `HabitCheckIn`, `CalendarEvent`, `DailyIntent`, `EveningReview`, `LifeLog`, `DeviceToken`)
+- `_id` is **String UUID** (client-generated), exposed as `id` in JSON
+- Index on `updatedAt` for sync pull queries; compound uniques on check-ins and daily records
+- Indexes ensured via `IndexSyncService.syncIndexes()` on startup
 
 ## Scheduled jobs (Phase 3+)
 
@@ -107,9 +106,16 @@ Use `@nestjs/schedule` on the VM process.
 cd server
 cp .env.example .env
 npm install
-npx prisma db push      # dev only
 npm run start:dev
 ```
+
+Local MongoDB example:
+
+```text
+mongodb://127.0.0.1:27017/stella
+```
+
+No replica set required.
 
 ## Deployment
 
@@ -120,3 +126,4 @@ See [../deployment.md](../deployment.md). API listens on internal port; nginx te
 - [sync.md](sync.md)
 - [../api/rest-api.md](../api/rest-api.md)
 - [../data-model.md](../data-model.md)
+- [../adr/007-mongoose-orm.md](../adr/007-mongoose-orm.md)

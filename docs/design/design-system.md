@@ -11,41 +11,52 @@ Dark, high-contrast, coach aesthetic. Stella should feel **serious and unavoidab
 
 ## Color tokens
 
+Implemented in `com.stella.core.ui.theme.Color`:
+
 | Token | Hex | Usage |
 |-------|-----|-------|
-| `background` | `#0D0D0F` | App scaffold, full-screen takeover |
-| `surface` | `#1A1A1E` | Cards, bottom sheets |
+| `background` | `#0A0A0A` | App scaffold |
+| `surface` | `#141414` | Elevated surfaces |
+| `surfaceCard` | `#1C1C1C` | Cards, drawer sheet |
 | `surfaceVariant` | `#252529` | Grid empty/future cells |
-| `primary` | `#E53935` | Missed habit, destructive, alarm accent |
+| `primary` | `#FF4F00` | Brand accent, CTAs, today outline |
 | `onPrimary` | `#FFFFFF` | Text on primary buttons |
 | `success` | `#43A047` | Done habit, completed task |
-| `warning` | `#FB8C00` | Snooze, time running out |
+| `error` | `#DC2626` | Missed habit, destructive |
 | `textPrimary` | `#F5F5F5` | Headlines, body |
-| `textMuted` | `#9E9E9E` | Secondary labels, hints |
-| `divider` | `#2E2E32` | Grid lines, list separators |
-| `overlayScrim` | `#CC000000` | Morning lock backdrop |
+| `textSecondary` | `#D0D0D0` | Metadata, completed tasks, drawer unselected labels |
+| `textMuted` | `#B8B8B8` | Eyebrow labels (`onSurfaceVariant`) |
+| `border` | `#33FFFFFF` | Card outlines |
+| `divider` | `#2E2E32` | Section rules, field borders |
 
 ### Habit grid cell colors
 
 | State | Color | Token |
 |-------|-------|-------|
 | Done | `#43A047` | `success` |
-| Missed (explicit or auto) | `#E53935` | `primary` |
-| Future / not yet due | `#252529` | `surfaceVariant` |
-| Today, not checked (before EOD) | `#252529` border `#FB8C00` | warning outline |
+| Missed (explicit or auto) | `#DC2626` | `error` |
+| Future / not yet due | transparent | — |
+| Today, not checked | border `#FF4F00` | `primary` |
+| Past, no check-in | border `error` @ 65% alpha | auto-missed |
 
 ## Typography
 
-Material 3 type scale with these overrides:
+Material 3 type scale (`Type.kt`):
 
 | Role | Style | Notes |
 |------|-------|-------|
-| Display | `headlineLarge`, bold | "Good morning" lock screen |
-| Title | `titleLarge` | Screen titles |
-| Body | `bodyLarge` | Forms, reviews |
-| Label | `labelMedium` | Habit names in grid rows |
-| Grid date | `labelSmall`, **monospace** | Column headers (Mon, Tue, …) |
-| Timer | `displayMedium`, monospace | Focus session countdown |
+| Display | `headlineLarge`, bold italic | Section titles (`StellaDisplayTitle`) |
+| Title | `titleMedium` / `titleLarge` | Top bar, dialogs |
+| Body | `bodyLarge` / `bodyMedium` | Primary content |
+| Label | `labelMedium` | Habit row names |
+| Eyebrow | `labelSmall`, **12sp monospace** | `StellaLabel` — minimum readable size |
+
+## Navigation
+
+- **Modal drawer** (phone): hamburger in top bar opens `StellaNavigationDrawer` (~280dp)
+- Six destinations: Control, Matrix, Frontline, Calendar, Review, System
+- Drawer items: 24dp icon + 16sp label; selected uses `primary` icon + `onSurface` text
+- Task detail: back arrow only; drawer disabled
 
 ## Spacing
 
@@ -57,100 +68,45 @@ Material 3 type scale with these overrides:
 | `lg` | 24 |
 | `xl` | 32 |
 
-Screen horizontal padding: `md` (16dp).
+Screen horizontal padding: 24dp.
 
 ## Shape
 
 | Element | Radius |
 |---------|--------|
-| Cards | 12dp |
-| Buttons | 8dp |
-| Habit cell | 4dp |
-| Full-screen takeover | 0dp (edge-to-edge) |
+| Cards | 4dp |
+| Drawer rows | 0dp (full-width highlight) |
+| Habit cell | 0dp (square) |
 
 ## Components
 
 ### HabitGrid
 
-- `LazyVerticalGrid` or custom `Row`/`Column` layout
-- Fixed row height: 48dp; cell: 32×32dp
-- Row label: habit name, ellipsized, `labelMedium`
-- Column headers: day abbreviation + date number (monospace)
-- Tap cell: toggle `DONE` / `MISSED` for that day (today and past only)
-- Long-press row: reorder (Phase 1.5) or edit habit
+- Row label: `bodyMedium`, `onSurface`
+- Column headers: `StellaLabel` (12sp monospace)
+- Cell: 48×48dp; tap toggles DONE/MISSED
 
-### TaskRow
+### StellaTopBar
 
-- Leading: priority indicator (vertical bar: HIGH = red, MEDIUM = orange, LOW = muted)
-- Title: `bodyLarge`
-- Trailing: scheduled time or status chip
-- Swipe: mark done (optional)
+- Menu icon (root screens) or back arrow (task detail)
+- Brand title + status eyebrow
+- 2dp `primary` accent rule
 
-### Top3IntentCard
+### OutlinedTextField
 
-- Numbered slots 1–3
-- Empty slot: dashed border, "Pick a frog"
-- Filled: task title + estimated block time
-
-### EnforcementBanner
-
-- Full-width, `primary` background
-- Copy: direct imperative ("Start focus session now")
-- Single CTA button, full width
-
-### FullScreenTakeover
-
-- Black/scrim background
-- Task title centered
-- Countdown: "5:00 to start"
-- Actions: **Start Focus** (filled), **Snooze** (text, muted — limited uses)
-
-### EveningReviewForm
-
-- Section 1: Planned vs actual (multiline)
-- Section 2: Reflection (multiline)
-- Embedded mini habit grid (read-only snapshot)
-- Submit: "Close the day" (disabled until both sections touched)
-
-### StellaButton
-
-| Variant | Style |
-|---------|-------|
-| Primary | Filled, `primary` or `success` |
-| Secondary | Outlined, `textPrimary` border |
-| Danger | Filled `primary` for destructive confirm |
-
-## Icons
-
-Material Symbols Outlined:
-
-- Habits: `grid_view`
-- Tasks: `check_circle`
-- Calendar: `calendar_today`
-- Settings: `settings`
-- NFC: `nfc`
-- Alarm: `notifications_active`
-
-## Motion
-
-- Screen transitions: 200ms fade
-- Habit cell toggle: 150ms color crossfade
-- Takeover entrance: none (instant — feels abrupt by design)
-- Focus timer: no playful animations
+Use `stellaTextFieldColors()` for focused `primary` border and readable labels.
 
 ## Accessibility
 
-- Minimum touch target: 48dp
-- Color is not sole indicator: DONE/MISSED also use content description
-- TalkBack labels on grid cells: "Drink Water, Tuesday, done"
+- Minimum touch target: 48dp (drawer rows, cells)
+- Eyebrow labels: 12sp minimum (not 10sp)
+- Color is not sole indicator on habit cells (icons for DONE/MISSED)
 
 ## Compose theme mapping
 
-Implement in `com.stella.core.ui.theme`:
-
-- `StellaColors` object with tokens above
-- `StellaTheme` wraps Material3 `darkColorScheme` with custom colors
-- `MaterialTheme.colorScheme` — do not use dynamic color
+- `StellaTheme` wraps Material3 `darkColorScheme` with tokens above
+- API JSON uses `id`; maps from MongoDB `_id` on server
+- Do not use dynamic color
 
 ## Related
 

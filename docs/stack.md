@@ -38,8 +38,8 @@ Single source of truth for Stella. Supersedes PostgreSQL mentions in [Initial.md
 |---------|------------|-------|
 | Runtime | Node.js 20 LTS | |
 | Framework | NestJS | TypeScript, modular |
-| ORM | Prisma | MongoDB provider |
-| Database | MongoDB Atlas | Managed cluster |
+| ODM | Mongoose + `@nestjs/mongoose` | Schemas in `server/src/database/schemas/` |
+| Database | MongoDB Atlas | Managed cluster; local standalone OK for dev |
 | Auth | API key header | `X-Api-Key`; see [adr/004-api-key-auth.md](adr/004-api-key-auth.md) |
 | Push (Phase 3) | Firebase Admin SDK | FCM to device |
 | AI (later) | OpenAI API | Nest `@Cron` evening job |

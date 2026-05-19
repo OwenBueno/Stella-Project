@@ -153,9 +153,24 @@ Append-heavy audit trail for searchable history.
 | `fcmToken` | string | |
 | `updatedAt` | ISO-8601 | |
 
-## Prisma schema sketch
+## Server persistence (Mongoose)
 
-See `server/prisma/schema.prisma` for implementation. Models use `String @id` for UUID ids and `DateTime` for timestamps.
+Schemas live in `server/src/database/schemas/`. MongoDB collection names match prior Prisma defaults:
+
+| Model | Collection |
+|-------|------------|
+| Habit | `Habit` |
+| HabitCheckIn | `HabitCheckIn` |
+| Task | `Task` |
+| CalendarEvent | `CalendarEvent` |
+| DailyIntent | `DailyIntent` |
+| EveningReview | `EveningReview` |
+| LifeLog | `LifeLog` |
+| DeviceToken | `DeviceToken` |
+
+- `_id`: String UUID (same value as API `id`)
+- `habitGridSnapshot` / `payload`: `Schema.Types.Mixed`
+- Explicit `createdAt` / `updatedAt` (no Mongoose timestamps)
 
 ## Room database
 
@@ -167,3 +182,4 @@ See `server/prisma/schema.prisma` for implementation. Models use `String @id` fo
 
 - [api/rest-api.md](api/rest-api.md)
 - [architecture/sync.md](architecture/sync.md)
+- [adr/007-mongoose-orm.md](adr/007-mongoose-orm.md)

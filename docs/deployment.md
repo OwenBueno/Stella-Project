@@ -27,7 +27,7 @@ flowchart LR
 mongodb+srv://<user>:<password>@<cluster>.mongodb.net/stella?retryWrites=true&w=majority
 ```
 
-Store as `DATABASE_URL` in server environment (Prisma accepts MongoDB URL).
+Store as `DATABASE_URL` in server environment.
 
 ## GCP VM setup
 
@@ -110,18 +110,15 @@ API key: entered in Settings UI, stored in `EncryptedSharedPreferences`.
 ## Deploy procedure
 
 1. Push code to VM (`git pull` or CI deploy).
-2. `cd server && npm ci && npx prisma generate && npm run build`
+2. `cd server && npm ci && npm run build`
 3. `docker compose -f infra/docker-compose.yml up -d --build`
 4. Verify: `curl -H "X-Api-Key: $KEY" https://api.yourdomain.com/api/v1/habits`
 
-## Database migrations
+## Database indexes
 
-Prisma for MongoDB:
+Mongoose schemas declare indexes; the API runs `syncIndexes()` on startup (`IndexSyncService`). For production schema changes, deploy the new build and confirm indexes in Atlas if needed.
 
-```bash
-npx prisma db push    # dev
-# production: review schema changes; db push or migrate when available
-```
+No `prisma db push` or migration CLI.
 
 ## Monitoring (minimal solo setup)
 
@@ -147,3 +144,4 @@ npx prisma db push    # dev
 
 - [stack.md](stack.md)
 - [api/rest-api.md](api/rest-api.md)
+- [adr/007-mongoose-orm.md](adr/007-mongoose-orm.md)
