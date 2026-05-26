@@ -10,6 +10,8 @@ data class CalendarEventEntity(
     val startAt: String,
     val endAt: String,
     val linkedTaskId: String?,
+    val recurrenceRuleJson: String? = null,
+    val reminderOffsetsJson: String? = null,
     val createdAt: String,
     val updatedAt: String,
     val deletedAt: String? = null,

@@ -32,6 +32,10 @@ export class CreateTaskDto {
   status!: string;
 
   @IsOptional()
+  @IsInt()
+  sortOrder?: number;
+
+  @IsOptional()
   @IsIn(['LOW', 'MEDIUM', 'HIGH'])
   priority?: string;
 

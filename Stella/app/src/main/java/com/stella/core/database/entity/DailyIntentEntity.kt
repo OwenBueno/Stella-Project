@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 data class DailyIntentEntity(
     @PrimaryKey val id: String,
     val date: String,
-    val top3TaskIds: List<String>,
+    val plannedTaskIds: List<String>,
     val completedAt: String,
     val nfcTagId: String,
     val updatedAt: String,

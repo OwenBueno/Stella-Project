@@ -46,6 +46,7 @@ Stella is a solo-use aggressive Life OS: habit grid, internal calendar, morning 
 | [adr/004-api-key-auth.md](adr/004-api-key-auth.md) | Solo API key authentication |
 | [adr/005-nfc-morning-unlock.md](adr/005-nfc-morning-unlock.md) | NFC-only morning unlock |
 | [adr/006-penalties-deferred.md](adr/006-penalties-deferred.md) | Financial penalties deferred |
+| [adr/008-finances-ledger.md](adr/008-finances-ledger.md) | Single-entry finances ledger |
 
 ## Historical
 

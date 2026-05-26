@@ -6,6 +6,14 @@
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <uses-feature android:name="android.hardware.nfc" android:required="true" />
 
@@ -25,6 +33,7 @@
             android:name=".app.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.Stella">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -35,6 +44,8 @@
         <activity
             android:name="com.stella.feature.morning.MorningLockActivity"
             android:exported="false"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
             android:theme="@style/Theme.Stella" />
@@ -42,12 +53,44 @@
         <activity
             android:name="com.stella.feature.dailyintent.DailyIntentActivity"
             android:exported="false"
+            android:screenOrientation="portrait"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.Stella" />
+
+        <activity
+            android:name="com.stella.feature.morning.MorningLockSetupActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.Stella" />
 
         <activity
             android:name="com.stella.feature.nfc.NfcEnrollmentActivity"
             android:exported="false"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.Stella" />
+
+        <receiver
+            android:name="com.stella.sync.MorningAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name="com.stella.sync.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name="com.stella.feature.morning.MorningLockEnforcementService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="morning_lock_enforcement" />
+        </service>
 
         <provider
             android:name="androidx.startup.InitializationProvider"

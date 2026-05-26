@@ -11,6 +11,7 @@ data class TaskEntity(
     val scheduledAt: String?,
     val durationMinutes: Int?,
     val status: String,
+    val sortOrder: Int = 0,
     val priority: String?,
     val createdAt: String,
     val updatedAt: String,

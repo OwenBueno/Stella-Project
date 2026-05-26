@@ -9,16 +9,20 @@ import { Habit, HabitDocument } from '../database/schemas/habit.schema';
 import { HabitCheckIn, HabitCheckInDocument } from '../database/schemas/habit-check-in.schema';
 import { LifeLog, LifeLogDocument } from '../database/schemas/life-log.schema';
 import { Task, TaskDocument } from '../database/schemas/task.schema';
+import { Transaction, TransactionDocument } from '../database/schemas/transaction.schema';
+import { Debt, DebtDocument } from '../database/schemas/debt.schema';
 import { isIncomingNewer } from '../common/sync/lww.util';
 import {
   SyncCheckInDto,
   SyncDailyIntentDto,
+  SyncDebtDto,
   SyncEventDto,
   SyncEveningReviewDto,
   SyncHabitDto,
   SyncLifeLogDto,
   SyncPushDto,
   SyncTaskDto,
+  SyncTransactionDto,
 } from './dto/sync-push.dto';
 
 @Injectable()
@@ -35,6 +39,9 @@ export class SyncService {
     @InjectModel(EveningReview.name)
     private readonly eveningReviewModel: Model<EveningReviewDocument>,
     @InjectModel(LifeLog.name) private readonly lifeLogModel: Model<LifeLogDocument>,
+    @InjectModel(Transaction.name)
+    private readonly transactionModel: Model<TransactionDocument>,
+    @InjectModel(Debt.name) private readonly debtModel: Model<DebtDocument>,
   ) {}
 
   async push(dto: SyncPushDto) {
@@ -86,6 +93,18 @@ export class SyncService {
       else if (result.conflict) conflicts.push(result.conflict);
     }
 
+    for (const tx of dto.transactions ?? []) {
+      const result = await this.upsertTransaction(tx);
+      if (result === 'accepted') accepted++;
+      else if (result.conflict) conflicts.push(result.conflict);
+    }
+
+    for (const debt of dto.debts ?? []) {
+      const result = await this.upsertDebt(debt);
+      if (result === 'accepted') accepted++;
+      else if (result.conflict) conflicts.push(result.conflict);
+    }
+
     return { accepted, conflicts };
   }
 
@@ -94,7 +113,7 @@ export class SyncService {
     const serverTime = new Date().toISOString();
     const filter = { updatedAt: { $gt: sinceDate } };
 
-    const [habits, habitCheckIns, tasks, events, dailyIntents, eveningReviews, lifeLogs] =
+    const [habits, habitCheckIns, tasks, events, dailyIntents, eveningReviews, lifeLogs, transactions, debts] =
       await Promise.all([
         this.habitModel.find(filter).exec(),
         this.checkInModel.find(filter).exec(),
@@ -103,6 +122,8 @@ export class SyncService {
         this.dailyIntentModel.find(filter).exec(),
         this.eveningReviewModel.find(filter).exec(),
         this.lifeLogModel.find(filter).exec(),
+        this.transactionModel.find(filter).exec(),
+        this.debtModel.find(filter).exec(),
       ]);
 
     return {
@@ -114,6 +135,8 @@ export class SyncService {
       dailyIntents: mapDocs(dailyIntents),
       eveningReviews: mapDocs(eveningReviews),
       lifeLogs: mapDocs(lifeLogs),
+      transactions: mapDocs(transactions),
+      debts: mapDocs(debts),
     };
   }
 
@@ -158,11 +181,21 @@ export class SyncService {
         serverDocument: mapDoc(existing),
       });
     }
+    const completedAt =
+      dto.status === 'DONE' && dto.completedAt
+        ? new Date(dto.completedAt)
+        : dto.status === 'DONE'
+          ? new Date(dto.updatedAt)
+          : null;
     if (existing) {
       await this.checkInModel
         .updateOne(
           { _id: existing._id },
-          { status: dto.status, updatedAt: new Date(dto.updatedAt) },
+          {
+            status: dto.status,
+            completedAt,
+            updatedAt: new Date(dto.updatedAt),
+          },
         )
         .exec();
     } else {
@@ -171,6 +204,7 @@ export class SyncService {
         habitId: dto.habitId,
         date: dto.date,
         status: dto.status,
+        completedAt,
         updatedAt: new Date(dto.updatedAt),
       });
     }
@@ -192,6 +226,7 @@ export class SyncService {
       scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
       durationMinutes: dto.durationMinutes ?? null,
       status: dto.status,
+      sortOrder: dto.sortOrder ?? 0,
       priority: dto.priority ?? null,
       updatedAt: new Date(dto.updatedAt),
       deletedAt: dto.deletedAt ? new Date(dto.deletedAt) : null,
@@ -224,6 +259,8 @@ export class SyncService {
       startAt: new Date(dto.startAt),
       endAt: new Date(dto.endAt),
       linkedTaskId: dto.linkedTaskId ?? null,
+      recurrenceRuleJson: dto.recurrenceRuleJson ?? null,
+      reminderOffsetsJson: dto.reminderOffsetsJson ?? null,
       updatedAt: new Date(dto.updatedAt),
       deletedAt: dto.deletedAt ? new Date(dto.deletedAt) : null,
     };
@@ -255,7 +292,7 @@ export class SyncService {
     }
 
     const data = {
-      top3TaskIds: dto.top3TaskIds,
+      plannedTaskIds: dto.plannedTaskIds,
       completedAt: new Date(dto.completedAt),
       nfcTagId: dto.nfcTagId,
       updatedAt: new Date(dto.updatedAt),
@@ -320,6 +357,73 @@ export class SyncService {
       await this.lifeLogModel.updateOne({ _id: dto.id }, data).exec();
     } else {
       await this.lifeLogModel.create({ _id: dto.id, ...data });
+    }
+    return 'accepted';
+  }
+
+  private async upsertTransaction(
+    dto: SyncTransactionDto,
+  ): Promise<'accepted' | { conflict: { entity: string; id: string; serverDocument: unknown } }> {
+    const existing = await this.transactionModel.findById(dto.id).exec();
+    if (existing && !isIncomingNewer(dto.updatedAt, existing.updatedAt)) {
+      return {
+        conflict: { entity: 'transaction', id: dto.id, serverDocument: mapDoc(existing) },
+      };
+    }
+
+    const data = {
+      type: dto.type,
+      amount: dto.amount,
+      category: dto.category,
+      description: dto.description ?? null,
+      date: new Date(dto.date),
+      linkedTaskId: dto.linkedTaskId ?? null,
+      updatedAt: new Date(dto.updatedAt),
+      deletedAt: dto.deletedAt ? new Date(dto.deletedAt) : null,
+    };
+
+    if (existing) {
+      await this.transactionModel.updateOne({ _id: dto.id }, data).exec();
+    } else {
+      await this.transactionModel.create({
+        _id: dto.id,
+        ...data,
+        createdAt: new Date(dto.createdAt),
+      });
+    }
+    return 'accepted';
+  }
+
+  private async upsertDebt(
+    dto: SyncDebtDto,
+  ): Promise<'accepted' | { conflict: { entity: string; id: string; serverDocument: unknown } }> {
+    const existing = await this.debtModel.findById(dto.id).exec();
+    if (existing && !isIncomingNewer(dto.updatedAt, existing.updatedAt)) {
+      return {
+        conflict: { entity: 'debt', id: dto.id, serverDocument: mapDoc(existing) },
+      };
+    }
+
+    const data = {
+      contactName: dto.contactName,
+      direction: dto.direction,
+      totalAmount: dto.totalAmount,
+      remainingAmount: dto.remainingAmount,
+      dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
+      notes: dto.notes ?? null,
+      isResolved: dto.isResolved,
+      updatedAt: new Date(dto.updatedAt),
+      deletedAt: dto.deletedAt ? new Date(dto.deletedAt) : null,
+    };
+
+    if (existing) {
+      await this.debtModel.updateOne({ _id: dto.id }, data).exec();
+    } else {
+      await this.debtModel.create({
+        _id: dto.id,
+        ...data,
+        createdAt: new Date(dto.createdAt),
+      });
     }
     return 'accepted';
   }

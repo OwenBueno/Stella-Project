@@ -13,6 +13,7 @@ data class HabitCheckInEntity(
     val habitId: String,
     val date: String,
     val status: String,
+    val completedAt: String? = null,
     val updatedAt: String,
     val needsSync: Boolean = true,
 )

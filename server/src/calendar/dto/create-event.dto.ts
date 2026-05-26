@@ -22,6 +22,14 @@ export class CreateEventDto {
   @IsUUID()
   linkedTaskId?: string;
 
+  @IsOptional()
+  @IsString()
+  recurrenceRuleJson?: string;
+
+  @IsOptional()
+  @IsString()
+  reminderOffsetsJson?: string;
+
   @IsISO8601()
   createdAt!: string;
 

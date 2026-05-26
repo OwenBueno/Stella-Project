@@ -27,11 +27,11 @@ object HabitGridSnapshotUtil {
         val weekStart = weekDates.firstOrNull()?.let { DateUtils.formatDate(it) } ?: ""
         val cells = habits.flatMap { row ->
             weekDates.mapNotNull { date ->
-                val status = row.checkIns[DateUtils.formatDate(date)] ?: return@mapNotNull null
+                val checkIn = row.checkIns[DateUtils.formatDate(date)] ?: return@mapNotNull null
                 HabitGridCell(
                     habitId = row.habit.id,
                     date = DateUtils.formatDate(date),
-                    status = status.name,
+                    status = checkIn.status.name,
                 )
             }
         }

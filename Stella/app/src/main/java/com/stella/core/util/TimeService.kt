@@ -15,7 +15,7 @@ class TimeService @Inject constructor(
     private val settingsRepository: SettingsRepository,
 ) {
     fun zone(): ZoneId = runCatching {
-        ZoneId.of(settingsRepository.getTimeZoneId())
+        ZoneId.of(settingsRepository.effectiveTimeZoneId())
     }.getOrDefault(ZoneId.systemDefault())
 
     fun today(): LocalDate = LocalDate.now(zone())
@@ -45,6 +45,14 @@ class TimeService @Inject constructor(
         val end = month.atEndOfMonth().atTime(23, 59, 59).atZone(zone()).toInstant().toString()
         return start to end
     }
+
+    fun dayInstantRange(date: LocalDate): Pair<String, String> {
+        val start = date.atStartOfDay(zone()).toInstant().toString()
+        val end = date.atTime(23, 59, 59).atZone(zone()).toInstant().toString()
+        return start to end
+    }
+
+    fun dateKey(date: LocalDate): String = date.toString()
 
     fun zoneDisplayName(): String = zone().id
 }

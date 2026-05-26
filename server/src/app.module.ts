@@ -7,6 +7,7 @@ import { HabitsModule } from './habits/habits.module';
 import { HealthController } from './health/health.controller';
 import { DailyIntentsModule } from './daily-intents/daily-intents.module';
 import { EveningReviewsModule } from './evening-reviews/evening-reviews.module';
+import { FinancesModule } from './finances/finances.module';
 import { SyncModule } from './sync/sync.module';
 import { TasksModule } from './tasks/tasks.module';
 
@@ -19,6 +20,7 @@ import { TasksModule } from './tasks/tasks.module';
     SyncModule,
     DailyIntentsModule,
     EveningReviewsModule,
+    FinancesModule,
   ],
   controllers: [HealthController],
   providers: [

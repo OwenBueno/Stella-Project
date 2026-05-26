@@ -46,6 +46,8 @@ export class CalendarService {
       startAt: new Date(dto.startAt),
       endAt: new Date(dto.endAt),
       linkedTaskId: dto.linkedTaskId ?? null,
+      recurrenceRuleJson: dto.recurrenceRuleJson ?? null,
+      reminderOffsetsJson: dto.reminderOffsetsJson ?? null,
       createdAt: new Date(dto.createdAt),
       updatedAt: new Date(dto.updatedAt),
       deletedAt: dto.deletedAt ? new Date(dto.deletedAt) : null,
@@ -64,6 +66,12 @@ export class CalendarService {
           ...(dto.endAt !== undefined && { endAt: new Date(dto.endAt) }),
           ...(dto.linkedTaskId !== undefined && {
             linkedTaskId: dto.linkedTaskId,
+          }),
+          ...(dto.recurrenceRuleJson !== undefined && {
+            recurrenceRuleJson: dto.recurrenceRuleJson,
+          }),
+          ...(dto.reminderOffsetsJson !== undefined && {
+            reminderOffsetsJson: dto.reminderOffsetsJson,
           }),
           ...(dto.updatedAt !== undefined && {
             updatedAt: new Date(dto.updatedAt),

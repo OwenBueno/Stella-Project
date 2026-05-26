@@ -5,19 +5,23 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.stella.core.database.dao.CalendarEventDao
 import com.stella.core.database.dao.DailyIntentDao
+import com.stella.core.database.dao.DebtDao
 import com.stella.core.database.dao.EveningReviewDao
 import com.stella.core.database.dao.HabitDao
 import com.stella.core.database.dao.LifeLogDao
 import com.stella.core.database.dao.SyncMetaDao
 import com.stella.core.database.dao.TaskDao
+import com.stella.core.database.dao.TransactionDao
 import com.stella.core.database.entity.CalendarEventEntity
 import com.stella.core.database.entity.DailyIntentEntity
+import com.stella.core.database.entity.DebtEntity
 import com.stella.core.database.entity.EveningReviewEntity
 import com.stella.core.database.entity.HabitCheckInEntity
 import com.stella.core.database.entity.HabitEntity
 import com.stella.core.database.entity.LifeLogEntity
 import com.stella.core.database.entity.SyncMetaEntity
 import com.stella.core.database.entity.TaskEntity
+import com.stella.core.database.entity.TransactionEntity
 
 @Database(
     entities = [
@@ -29,8 +33,10 @@ import com.stella.core.database.entity.TaskEntity
         DailyIntentEntity::class,
         EveningReviewEntity::class,
         LifeLogEntity::class,
+        TransactionEntity::class,
+        DebtEntity::class,
     ],
-    version = 3,
+    version = 8,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -42,4 +48,6 @@ abstract class StellaDatabase : RoomDatabase() {
     abstract fun dailyIntentDao(): DailyIntentDao
     abstract fun eveningReviewDao(): EveningReviewDao
     abstract fun lifeLogDao(): LifeLogDao
+    abstract fun transactionDao(): TransactionDao
+    abstract fun debtDao(): DebtDao
 }

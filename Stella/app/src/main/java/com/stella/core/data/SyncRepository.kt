@@ -2,28 +2,35 @@ package com.stella.core.data
 
 import com.stella.core.database.dao.CalendarEventDao
 import com.stella.core.database.dao.DailyIntentDao
+import com.stella.core.database.dao.DebtDao
 import com.stella.core.database.dao.EveningReviewDao
 import com.stella.core.database.dao.HabitDao
 import com.stella.core.database.dao.LifeLogDao
 import com.stella.core.database.dao.SyncMetaDao
 import com.stella.core.database.dao.TaskDao
+import com.stella.core.database.dao.TransactionDao
 import com.stella.core.database.entity.CalendarEventEntity
 import com.stella.core.database.entity.DailyIntentEntity
+import com.stella.core.database.entity.DebtEntity
 import com.stella.core.database.entity.EveningReviewEntity
 import com.stella.core.database.entity.HabitCheckInEntity
 import com.stella.core.database.entity.HabitEntity
 import com.stella.core.database.entity.LifeLogEntity
 import com.stella.core.database.entity.SyncMetaEntity
 import com.stella.core.database.entity.TaskEntity
+import com.stella.core.database.entity.TransactionEntity
 import com.stella.core.network.StellaApi
 import com.stella.core.network.SyncCheckInDto
 import com.stella.core.network.SyncDailyIntentDto
+import com.stella.core.network.SyncDebtDto
 import com.stella.core.network.SyncEventDto
 import com.stella.core.network.SyncEveningReviewDto
 import com.stella.core.network.SyncHabitDto
 import com.stella.core.network.SyncLifeLogDto
 import com.stella.core.network.SyncPushRequest
 import com.stella.core.network.SyncTaskDto
+import com.stella.core.network.SyncTransactionDto
+import com.stella.sync.EventReminderScheduler
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -38,8 +45,11 @@ class SyncRepository @Inject constructor(
     private val dailyIntentDao: DailyIntentDao,
     private val eveningReviewDao: EveningReviewDao,
     private val lifeLogDao: LifeLogDao,
+    private val transactionDao: TransactionDao,
+    private val debtDao: DebtDao,
     private val syncMetaDao: SyncMetaDao,
     private val lifeLogWriter: LifeLogWriter,
+    private val eventReminderScheduler: EventReminderScheduler,
 ) {
     suspend fun syncNow(): Result<String> = runCatching {
         val meta = ensureMeta()
@@ -57,6 +67,8 @@ class SyncRepository @Inject constructor(
         dailyIntentDao.deleteAll()
         eveningReviewDao.deleteAll()
         lifeLogDao.deleteAll()
+        transactionDao.deleteAll()
+        debtDao.deleteAll()
     }
 
     private suspend fun ensureMeta(): SyncMetaEntity {
@@ -79,11 +91,14 @@ class SyncRepository @Inject constructor(
         val intentEntities = dailyIntentDao.getNeedingSync()
         val reviewEntities = eveningReviewDao.getNeedingSync()
         val logEntities = lifeLogDao.getNeedingSync()
+        val transactionEntities = transactionDao.getNeedingSync()
+        val debtEntities = debtDao.getNeedingSync()
 
         val hasWork = habitEntities.isNotEmpty() || checkInEntities.isNotEmpty() ||
             taskEntities.isNotEmpty() || eventEntities.isNotEmpty() ||
             intentEntities.isNotEmpty() || reviewEntities.isNotEmpty() ||
-            logEntities.isNotEmpty()
+            logEntities.isNotEmpty() || transactionEntities.isNotEmpty() ||
+            debtEntities.isNotEmpty()
 
         if (!hasWork) return "nothing to push"
 
@@ -99,6 +114,8 @@ class SyncRepository @Inject constructor(
                 dailyIntents = intentEntities.map { it.toDto() },
                 eveningReviews = reviewEntities.map { it.toDto() },
                 lifeLogs = logEntities.map { it.toDto() },
+                transactions = transactionEntities.map { it.toDto() },
+                debts = debtEntities.map { it.toDto() },
             ),
         )
 
@@ -109,6 +126,8 @@ class SyncRepository @Inject constructor(
         intentEntities.forEach { dailyIntentDao.upsert(it.copy(needsSync = false)) }
         reviewEntities.forEach { eveningReviewDao.upsert(it.copy(needsSync = false)) }
         logEntities.forEach { lifeLogDao.upsert(it.copy(needsSync = false)) }
+        transactionEntities.forEach { transactionDao.upsert(it.copy(needsSync = false)) }
+        debtEntities.forEach { debtDao.upsert(it.copy(needsSync = false)) }
 
         syncMetaDao.upsert(meta.copy(lastPushedAt = pushedAt))
         return "h${habitEntities.size} t${taskEntities.size} i${intentEntities.size}"
@@ -137,6 +156,7 @@ class SyncRepository @Inject constructor(
                     habitId = dto.habitId,
                     date = dto.date,
                     status = dto.status,
+                    completedAt = dto.completedAt,
                     updatedAt = dto.updatedAt,
                     needsSync = false,
                 ),
@@ -151,6 +171,7 @@ class SyncRepository @Inject constructor(
                     scheduledAt = dto.scheduledAt,
                     durationMinutes = dto.durationMinutes,
                     status = dto.status,
+                    sortOrder = dto.sortOrder,
                     priority = dto.priority,
                     createdAt = dto.createdAt,
                     updatedAt = dto.updatedAt,
@@ -167,6 +188,8 @@ class SyncRepository @Inject constructor(
                     startAt = dto.startAt,
                     endAt = dto.endAt,
                     linkedTaskId = dto.linkedTaskId,
+                    recurrenceRuleJson = dto.recurrenceRuleJson,
+                    reminderOffsetsJson = dto.reminderOffsetsJson,
                     createdAt = dto.createdAt,
                     updatedAt = dto.updatedAt,
                     deletedAt = dto.deletedAt,
@@ -179,7 +202,7 @@ class SyncRepository @Inject constructor(
                 DailyIntentEntity(
                     id = dto.id,
                     date = dto.date,
-                    top3TaskIds = dto.top3TaskIds,
+                    plannedTaskIds = dto.plannedTaskIds,
                     completedAt = dto.completedAt,
                     nfcTagId = dto.nfcTagId,
                     updatedAt = dto.updatedAt,
@@ -213,7 +236,43 @@ class SyncRepository @Inject constructor(
                 ),
             )
         }
+        response.transactions.forEach { dto ->
+            transactionDao.upsert(
+                TransactionEntity(
+                    id = dto.id,
+                    type = dto.type,
+                    amount = dto.amount,
+                    category = dto.category,
+                    description = dto.description,
+                    date = dto.date,
+                    linkedTaskId = dto.linkedTaskId,
+                    createdAt = dto.createdAt,
+                    updatedAt = dto.updatedAt,
+                    deletedAt = dto.deletedAt,
+                    needsSync = false,
+                ),
+            )
+        }
+        response.debts.forEach { dto ->
+            debtDao.upsert(
+                DebtEntity(
+                    id = dto.id,
+                    contactName = dto.contactName,
+                    direction = dto.direction,
+                    totalAmount = dto.totalAmount,
+                    remainingAmount = dto.remainingAmount,
+                    dueDate = dto.dueDate,
+                    notes = dto.notes,
+                    isResolved = dto.isResolved,
+                    createdAt = dto.createdAt,
+                    updatedAt = dto.updatedAt,
+                    deletedAt = dto.deletedAt,
+                    needsSync = false,
+                ),
+            )
+        }
         syncMetaDao.upsert(meta.copy(lastPulledAt = response.serverTime))
+        eventReminderScheduler.rescheduleAllActive()
     }
 
     private fun HabitEntity.toDto() = SyncHabitDto(
@@ -232,6 +291,7 @@ class SyncRepository @Inject constructor(
         date = date,
         status = status,
         updatedAt = updatedAt,
+        completedAt = completedAt,
     )
 
     private fun TaskEntity.toDto() = SyncTaskDto(
@@ -241,6 +301,7 @@ class SyncRepository @Inject constructor(
         scheduledAt = scheduledAt,
         durationMinutes = durationMinutes,
         status = status,
+        sortOrder = sortOrder,
         priority = priority,
         createdAt = createdAt,
         updatedAt = updatedAt,
@@ -253,6 +314,8 @@ class SyncRepository @Inject constructor(
         startAt = startAt,
         endAt = endAt,
         linkedTaskId = linkedTaskId,
+        recurrenceRuleJson = recurrenceRuleJson,
+        reminderOffsetsJson = reminderOffsetsJson,
         createdAt = createdAt,
         updatedAt = updatedAt,
         deletedAt = deletedAt,
@@ -261,7 +324,7 @@ class SyncRepository @Inject constructor(
     private fun DailyIntentEntity.toDto() = SyncDailyIntentDto(
         id = id,
         date = date,
-        top3TaskIds = top3TaskIds,
+        plannedTaskIds = plannedTaskIds,
         completedAt = completedAt,
         nfcTagId = nfcTagId,
         updatedAt = updatedAt,
@@ -283,5 +346,32 @@ class SyncRepository @Inject constructor(
         payload = payload,
         timestamp = timestamp,
         updatedAt = updatedAt,
+    )
+
+    private fun TransactionEntity.toDto() = SyncTransactionDto(
+        id = id,
+        type = type,
+        amount = amount,
+        category = category,
+        description = description,
+        date = date,
+        linkedTaskId = linkedTaskId,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
+    )
+
+    private fun DebtEntity.toDto() = SyncDebtDto(
+        id = id,
+        contactName = contactName,
+        direction = direction,
+        totalAmount = totalAmount,
+        remainingAmount = remainingAmount,
+        dueDate = dueDate,
+        notes = notes,
+        isResolved = isResolved,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
     )
 }

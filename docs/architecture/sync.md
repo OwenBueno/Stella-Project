@@ -61,7 +61,9 @@ Client sends batches of changed entities since last successful push.
   "events": [],
   "dailyIntents": [],
   "eveningReviews": [],
-  "lifeLogs": []
+  "lifeLogs": [],
+  "transactions": [],
+  "debts": []
 }
 ```
 
@@ -95,7 +97,9 @@ Returns all entities with `updatedAt > since` (excluding soft-deleted unless `in
   "events": [],
   "dailyIntents": [],
   "eveningReviews": [],
-  "lifeLogs": []
+  "lifeLogs": [],
+  "transactions": [],
+  "debts": []
 }
 ```
 

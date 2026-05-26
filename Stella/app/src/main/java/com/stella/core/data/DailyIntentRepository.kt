@@ -16,12 +16,16 @@ class DailyIntentRepository @Inject constructor(
     private val timeService: TimeService,
 ) {
     fun observeToday(): Flow<DailyIntentEntity?> =
-        dailyIntentDao.observeByDate(DateUtils.formatDate(timeService.today()))
+        observeByDate(timeService.today())
+
+    fun observeByDate(date: java.time.LocalDate): Flow<DailyIntentEntity?> =
+        dailyIntentDao.observeByDate(DateUtils.formatDate(date))
 
     suspend fun hasCompletedToday(): Boolean =
         dailyIntentDao.getByDate(DateUtils.formatDate(timeService.today())) != null
 
-    suspend fun saveIntent(top3TaskIds: List<String>, nfcTagId: String): String {
+    suspend fun saveIntent(plannedTaskIds: List<String>, nfcTagId: String): String {
+        require(plannedTaskIds.size >= 3) { "At least 3 planned tasks required" }
         val now = Instant.now().toString()
         val date = DateUtils.formatDate(timeService.today())
         val existing = dailyIntentDao.getByDate(date)
@@ -30,7 +34,7 @@ class DailyIntentRepository @Inject constructor(
             DailyIntentEntity(
                 id = id,
                 date = date,
-                top3TaskIds = top3TaskIds,
+                plannedTaskIds = plannedTaskIds,
                 completedAt = now,
                 nfcTagId = nfcTagId,
                 updatedAt = now,

@@ -189,6 +189,82 @@ DELETE /events/:id
 
 ---
 
+## Finances
+
+Base path: `/finances`. Solo API key auth (no `userId`).
+
+### Transactions
+
+```http
+POST /finances/transactions
+GET /finances/transactions?type=egress&category=Penalty&startDate=2026-05-01&endDate=2026-05-31
+```
+
+Create body (client-generated UUID):
+
+```json
+{
+  "id": "uuid",
+  "type": "egress",
+  "amount": 5.0,
+  "category": "Penalty",
+  "description": "Task skip",
+  "date": "2026-05-18T12:00:00Z",
+  "linkedTaskId": "task-uuid",
+  "createdAt": "2026-05-18T12:00:00Z",
+  "updatedAt": "2026-05-18T12:00:00Z"
+}
+```
+
+### Debts
+
+```http
+POST /finances/debts
+GET /finances/debts?resolved=false
+PATCH /finances/debts/:id
+```
+
+Patch body:
+
+```json
+{
+  "remainingAmount": 25.0,
+  "isResolved": false,
+  "notes": "Partial payment",
+  "updatedAt": "2026-05-18T12:00:00Z"
+}
+```
+
+### Summary
+
+```http
+GET /finances/summary?year=2026&month=5
+```
+
+Response:
+
+```json
+{
+  "ingress": 3200.0,
+  "egress": 1450.0,
+  "netBalance": 1750.0,
+  "owedToMe": 100.0,
+  "owedByMe": 50.0
+}
+```
+
+### Penalty helper (diagnostics / future skip flow)
+
+```http
+POST /finances/penalties
+```
+
+```json
+{ "taskId": "uuid", "amount": 5.0, "description": "optional" }
+```
+
+---
+
 ## Sync (Phase 1)
 
 ### Push
@@ -207,7 +283,9 @@ POST /sync/push
   "events": [],
   "dailyIntents": [],
   "eveningReviews": [],
-  "lifeLogs": []
+  "lifeLogs": [],
+  "transactions": [],
+  "debts": []
 }
 ```
 
@@ -249,7 +327,9 @@ Response `200`:
   "events": [],
   "dailyIntents": [],
   "eveningReviews": [],
-  "lifeLogs": []
+  "lifeLogs": [],
+  "transactions": [],
+  "debts": []
 }
 ```
 
@@ -268,7 +348,7 @@ Create body:
 {
   "id": "...",
   "date": "2026-05-18",
-  "top3TaskIds": ["id1", "id2", "id3"],
+  "plannedTaskIds": ["id1", "id2", "id3", "id4"],
   "completedAt": "2026-05-18T07:30:00Z",
   "nfcTagId": "04:ab:cd:...",
   "updatedAt": "2026-05-18T07:30:00Z"

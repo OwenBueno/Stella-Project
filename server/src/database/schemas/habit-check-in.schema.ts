@@ -18,6 +18,9 @@ export class HabitCheckIn {
   @Prop({ required: true })
   status!: string;
 
+  @Prop({ type: Date, default: null })
+  completedAt!: Date | null;
+
   @Prop({ type: Date, required: true })
   updatedAt!: Date;
 }

@@ -21,6 +21,9 @@ interface DailyIntentDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: DailyIntentEntity)
 
+    @Query("DELETE FROM daily_intents WHERE date = :date")
+    suspend fun deleteByDate(date: String)
+
     @Query("DELETE FROM daily_intents")
     suspend fun deleteAll()
 }

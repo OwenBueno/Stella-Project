@@ -42,6 +42,12 @@ interface HabitDao {
     @Query("SELECT * FROM habit_check_ins WHERE habitId = :habitId AND date = :date LIMIT 1")
     suspend fun getCheckIn(habitId: String, date: String): HabitCheckInEntity?
 
+    @Query("SELECT * FROM habits WHERE id = :id LIMIT 1")
+    suspend fun getHabit(id: String): HabitEntity?
+
+    @Query("DELETE FROM habit_check_ins WHERE habitId = :habitId AND date = :date")
+    suspend fun deleteCheckIn(habitId: String, date: String)
+
     @Query("DELETE FROM habits")
     suspend fun deleteAllHabits()
 

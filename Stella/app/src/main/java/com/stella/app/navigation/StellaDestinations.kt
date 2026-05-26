@@ -1,6 +1,7 @@
 package com.stella.app.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
@@ -11,9 +12,10 @@ import com.stella.core.ui.components.StellaNavItem
 
 val stellaNavItems = listOf(
     StellaNavItem(Routes.HOME, "Control", Icons.Default.Home),
-    StellaNavItem(Routes.HABITS, "Matrix", Icons.Default.GridView),
+    StellaNavItem(Routes.HABITS, "Habits", Icons.Default.GridView),
     StellaNavItem(Routes.TASKS, "Frontline", Icons.Default.CheckCircle),
     StellaNavItem(Routes.CALENDAR, "Calendar", Icons.Default.CalendarToday),
+    StellaNavItem(Routes.FINANCES, "Finances", Icons.Default.AccountBalance),
     StellaNavItem(Routes.REVIEW, "Review", Icons.Default.Assessment),
     StellaNavItem(Routes.SETTINGS, "System", Icons.Default.Settings),
 )
@@ -23,11 +25,9 @@ private val rootRoutes = setOf(
     Routes.HABITS,
     Routes.TASKS,
     Routes.CALENDAR,
+    Routes.FINANCES,
     Routes.REVIEW,
     Routes.SETTINGS,
 )
 
 fun isRootDestination(route: String?): Boolean = route != null && route in rootRoutes
-
-fun isTaskDetailRoute(route: String?): Boolean =
-    route != null && route.startsWith("tasks/") && route != Routes.TASKS

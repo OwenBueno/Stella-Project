@@ -31,7 +31,7 @@ object EveningReviewScheduler {
             context,
             EveningSchedulerEntryPoint::class.java,
         ).settingsRepository()
-        val zone = runCatching { ZoneId.of(settings.getTimeZoneId()) }.getOrDefault(ZoneId.systemDefault())
+        val zone = runCatching { ZoneId.of(settings.effectiveTimeZoneId()) }.getOrDefault(ZoneId.systemDefault())
         val target = LocalTime.of(settings.getEveningReviewHour(), settings.getEveningReviewMinute())
         val now = ZonedDateTime.now(zone)
         var next = now.with(target)

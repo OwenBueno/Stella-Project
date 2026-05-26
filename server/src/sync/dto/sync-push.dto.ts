@@ -2,9 +2,10 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsISO8601,
-  IsObject,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -29,6 +30,7 @@ export class SyncCheckInDto {
   @IsString() date!: string;
   @IsString() status!: string;
   @IsISO8601() updatedAt!: string;
+  @IsOptional() @IsISO8601() completedAt?: string;
 }
 
 export class SyncTaskDto {
@@ -38,6 +40,7 @@ export class SyncTaskDto {
   @IsOptional() @IsISO8601() scheduledAt?: string | null;
   @IsOptional() durationMinutes?: number | null;
   @IsString() status!: string;
+  @IsInt() sortOrder!: number;
   @IsOptional() priority?: string | null;
   @IsISO8601() createdAt!: string;
   @IsISO8601() updatedAt!: string;
@@ -50,6 +53,8 @@ export class SyncEventDto {
   @IsISO8601() startAt!: string;
   @IsISO8601() endAt!: string;
   @IsOptional() linkedTaskId?: string | null;
+  @IsOptional() @IsString() recurrenceRuleJson?: string | null;
+  @IsOptional() @IsString() reminderOffsetsJson?: string | null;
   @IsISO8601() createdAt!: string;
   @IsISO8601() updatedAt!: string;
   @IsOptional() @IsISO8601() deletedAt?: string;
@@ -60,9 +65,8 @@ export class SyncDailyIntentDto {
   @IsString() date!: string;
   @IsArray()
   @ArrayMinSize(3)
-  @ArrayMaxSize(3)
   @IsUUID('4', { each: true })
-  top3TaskIds!: string[];
+  plannedTaskIds!: string[];
   @IsISO8601() completedAt!: string;
   @IsString() nfcTagId!: string;
   @IsISO8601() updatedAt!: string;
@@ -84,6 +88,33 @@ export class SyncLifeLogDto {
   @IsString() payload!: string;
   @IsISO8601() timestamp!: string;
   @IsISO8601() updatedAt!: string;
+}
+
+export class SyncTransactionDto {
+  @IsUUID() id!: string;
+  @IsIn(['ingress', 'egress']) type!: string;
+  @IsNumber() amount!: number;
+  @IsString() category!: string;
+  @IsOptional() @IsString() description?: string | null;
+  @IsISO8601() date!: string;
+  @IsOptional() @IsUUID() linkedTaskId?: string | null;
+  @IsISO8601() createdAt!: string;
+  @IsISO8601() updatedAt!: string;
+  @IsOptional() @IsISO8601() deletedAt?: string;
+}
+
+export class SyncDebtDto {
+  @IsUUID() id!: string;
+  @IsString() contactName!: string;
+  @IsIn(['owed_to_me', 'owed_by_me']) direction!: string;
+  @IsNumber() totalAmount!: number;
+  @IsNumber() remainingAmount!: number;
+  @IsOptional() @IsISO8601() dueDate?: string | null;
+  @IsOptional() @IsString() notes?: string | null;
+  @IsBoolean() isResolved!: boolean;
+  @IsISO8601() createdAt!: string;
+  @IsISO8601() updatedAt!: string;
+  @IsOptional() @IsISO8601() deletedAt?: string;
 }
 
 export class SyncPushDto {
@@ -123,5 +154,18 @@ export class SyncPushDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => SyncLifeLogDto)
+  @IsOptional()
   lifeLogs!: SyncLifeLogDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SyncTransactionDto)
+  @IsOptional()
+  transactions?: SyncTransactionDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SyncDebtDto)
+  @IsOptional()
+  debts?: SyncDebtDto[];
 }

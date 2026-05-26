@@ -6,15 +6,19 @@ export * from './daily-intent.schema';
 export * from './evening-review.schema';
 export * from './life-log.schema';
 export * from './device-token.schema';
+export * from './transaction.schema';
+export * from './debt.schema';
 
 import { CalendarEvent, CalendarEventSchema } from './calendar-event.schema';
 import { DailyIntent, DailyIntentSchema } from './daily-intent.schema';
+import { Debt, DebtSchema } from './debt.schema';
 import { DeviceToken, DeviceTokenSchema } from './device-token.schema';
 import { EveningReview, EveningReviewSchema } from './evening-review.schema';
 import { Habit, HabitSchema } from './habit.schema';
 import { HabitCheckIn, HabitCheckInSchema } from './habit-check-in.schema';
 import { LifeLog, LifeLogSchema } from './life-log.schema';
 import { Task, TaskSchema } from './task.schema';
+import { Transaction, TransactionSchema } from './transaction.schema';
 
 export const stellaModels = [
   { name: Habit.name, schema: HabitSchema },
@@ -25,4 +29,6 @@ export const stellaModels = [
   { name: EveningReview.name, schema: EveningReviewSchema },
   { name: LifeLog.name, schema: LifeLogSchema },
   { name: DeviceToken.name, schema: DeviceTokenSchema },
+  { name: Transaction.name, schema: TransactionSchema },
+  { name: Debt.name, schema: DebtSchema },
 ];

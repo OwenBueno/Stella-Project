@@ -28,7 +28,7 @@ export class TasksService {
         (filter.scheduledAt as Record<string, Date>).$lte = new Date(scheduledTo);
       }
     }
-    const items = await this.taskModel.find(filter).sort({ scheduledAt: 1 }).exec();
+    const items = await this.taskModel.find(filter).sort({ sortOrder: 1, scheduledAt: 1 }).exec();
     return { items: mapDocs(items) };
   }
 
@@ -51,6 +51,7 @@ export class TasksService {
       scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
       durationMinutes: dto.durationMinutes ?? null,
       status: dto.status,
+      sortOrder: dto.sortOrder ?? 0,
       priority: dto.priority ?? null,
       createdAt: new Date(dto.createdAt),
       updatedAt: new Date(dto.updatedAt),
@@ -74,6 +75,7 @@ export class TasksService {
             durationMinutes: dto.durationMinutes,
           }),
           ...(dto.status !== undefined && { status: dto.status }),
+          ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
           ...(dto.priority !== undefined && { priority: dto.priority }),
           ...(dto.updatedAt !== undefined && {
             updatedAt: new Date(dto.updatedAt),

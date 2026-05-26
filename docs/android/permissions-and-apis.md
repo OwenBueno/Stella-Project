@@ -6,16 +6,17 @@ Reference for Stella's enforcement features. Targets **API 31+** (minSdk 31).
 
 | Permission | Phase | Purpose |
 |------------|-------|---------|
-| `SYSTEM_ALERT_WINDOW` | 2 | Draw morning lock over other apps |
+| `SYSTEM_ALERT_WINDOW` | 2 | Draw morning lock over other apps (implemented) |
 | `NFC` | 2 | Read bathroom tag |
-| `SCHEDULE_EXACT_ALARM` | 3 | Fire task reminders on time |
-| `USE_FULL_SCREEN_INTENT` | 3 | Show takeover on lock screen |
-| `POST_NOTIFICATIONS` | 2+ | Evening review + focus notification (API 33+) |
-| `FOREGROUND_SERVICE` | 3 | Focus timer |
-| `FOREGROUND_SERVICE_SPECIAL_USE` | 3 | Declare focus timer type (API 34+) |
-| `RECEIVE_BOOT_COMPLETED` | 2 | Reschedule alarms after reboot |
+| `SCHEDULE_EXACT_ALARM` | 2–3 | Morning wake alarm + task reminders |
+| `USE_FULL_SCREEN_INTENT` | 2–3 | Morning alarm on lock screen + task takeover |
+| `POST_NOTIFICATIONS` | 2+ | Morning alarm, evening review, enforcement FGS (API 33+) |
+| `FOREGROUND_SERVICE` | 2–3 | Morning enforcement + focus timer |
+| `FOREGROUND_SERVICE_SPECIAL_USE` | 2–3 | Morning lock + focus timer (API 34+) |
+| `RECEIVE_BOOT_COMPLETED` | 2 | Reschedule morning + task alarms after reboot |
+| `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | 2 | Reliable wake alarm (setup wizard) |
 | `VIBRATE` | 3 | Alarm vibration |
-| `WAKE_LOCK` | 3 | Keep alarm visible |
+| `WAKE_LOCK` | 2–3 | Keep alarm visible |
 
 Optional (future, not v1):
 
@@ -40,28 +41,39 @@ Optional (future, not v1):
 <uses-feature android:name="android.hardware.nfc" android:required="true" />
 ```
 
-## Feature: Morning hostage (Phase 2)
+## Feature: Morning hostage (Phase 2) — implemented
+
+### Components
+
+| Piece | Location |
+|-------|----------|
+| Wake scheduler | `MorningAlarmScheduler` (`setAlarmClock`) |
+| Alarm receiver | `MorningAlarmReceiver` → FSI notification + `MorningLockActivity` |
+| Enforcement FGS | `MorningLockEnforcementService` (relaunch + overlay when user leaves) |
+| Overlay | `MorningLockOverlay` (`TYPE_APPLICATION_OVERLAY`, Compose with dedicated `LifecycleOwner`) |
+| State | `MorningLockController` |
+| Setup wizard | `MorningLockSetupActivity` |
+| Boot reschedule | `BootReceiver` |
 
 ### APIs
 
 - `Settings.canDrawOverlays()` / `ACTION_MANAGE_OVERLAY_PERMISSION`
-- Full-screen `Activity` with `showWhenLocked` + `turnScreenOn`, or `TYPE_APPLICATION_OVERLAY` window
-
-### Implementation notes
-
-```kotlin
-// Activity flags for lock screen
-setShowWhenLocked(true)
-setTurnScreenOn(true)
-```
-
-- Launch from alarm `BroadcastReceiver` or `BootReceiver`
-- Back button disabled while locked
-- No production bypass — debug builds only may expose skip via `BuildConfig.DEBUG`
+- `AlarmManager.setAlarmClock()` + `MorningAlarmReceiver`
+- `NotificationCompat` full-screen intent (`USE_FULL_SCREEN_INTENT`; on API 34+ user must allow full-screen intents in app notification settings)
+- Test flow: launch `MorningLockActivity` first; enforcement/ringer/FSI start in `onResume` after `lockSurfaceReady` is set (overlay only shows after lock surface has been visible)
+- Alarm audio: `MorningAlarmRinger` with progressive volume ramp (configurable in Settings → Morning lock); FSI notification channel is silent to avoid double playback
+- Test unlock from wizard returns to setup **TEST** step (no `CLEAR_TASK` to main); wizard step persisted in encrypted prefs
+- `MorningLockActivity` / `DailyIntentActivity`: `setShowWhenLocked`, `setTurnScreenOn`, `requestDismissKeyguard`
+- `OnBackPressedDispatcher` callback consumes back while locked
+- **Not in v1:** Accessibility service (power-off / uninstall block) — deferred for Play policy
 
 ### Onboarding
 
-Settings screen explains why overlay is required, links to system settings.
+**Settings → Morning lock → Set up morning lock** runs the wizard (NFC, notifications, overlay, exact alarms, battery, test alarm).
+
+### Unlock rule
+
+NFC → `DailyIntentActivity` → save intent → `MorningLockController.stopEnforcement()`. NFC alone does not unlock the day.
 
 ---
 
@@ -73,11 +85,11 @@ Settings screen explains why overlay is required, links to system settings.
 - `NfcAdapter.ACTION_TAG_DISCOVERED` intent filter
 - Store enrolled tag id (e.g. tag serial) in EncryptedSharedPreferences
 
-### Enrollment flow (Settings)
+### Enrollment flow (Developer Options)
 
-1. User taps "Register bathroom tag".
-2. Activity listens for tag.
-3. Save identifier; show success.
+1. Settings → **Advanced Developer Options** → **Register New NFC Tag**.
+2. `NfcEnrollmentActivity` shows scan UI (Morning Lock visual pattern).
+3. Save identifier to EncryptedSharedPreferences; return to Advanced screen.
 
 ### Verification
 
@@ -193,8 +205,11 @@ Show in Settings when alarms are unreliable.
 | Test | Phase |
 |------|-------|
 | Overlay appears over Chrome | 2 |
+| Morning test alarm (setup / diagnostics) | 2 |
 | NFC wrong tag rejected | 2 |
 | NFC correct tag unlocks | 2 |
+| Home during lock returns to Stella | 2 |
+| Wake alarm fires at configured time | 2 |
 | Exact alarm fires at scheduled minute | 3 |
 | Takeover shows on locked phone | 3 |
 | Focus notification persists | 3 |

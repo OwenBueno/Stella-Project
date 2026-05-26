@@ -69,9 +69,9 @@ fun HabitGrid(
                     maxLines = 1,
                 )
                 weekDates.forEach { date ->
-                    val status = row.checkIns[DateUtils.formatDate(date)]
+                    val checkIn = row.checkIns[DateUtils.formatDate(date)]
                     HabitCell(
-                        status = status,
+                        status = checkIn?.status,
                         isToday = date == today,
                         isPast = date.isBefore(today),
                         onClick = {

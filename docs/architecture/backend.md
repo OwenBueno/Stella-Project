@@ -27,6 +27,7 @@ server/src/
 │   └── sync.service.ts
 ├── daily-intents/                 # POST + GET by date
 ├── evening-reviews/               # POST + GET by date
+├── finances/                      # transactions, debts, summary
 ├── notifications/                 # Phase 3 — FCM
 └── ai/                            # later — OpenAI cron
 ```

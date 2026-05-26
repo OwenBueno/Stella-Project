@@ -55,7 +55,7 @@ Phased delivery with **exit gates**. Do not start the next phase until the curre
 
 ### Goals
 
-- Morning cannot be skipped without NFC + Top 3
+- Morning cannot be skipped without NFC + daily intent (min 3 planned tasks)
 - Evening review persisted to life record
 - Life logs for key events
 
@@ -70,7 +70,7 @@ Phased delivery with **exit gates**. Do not start the next phase until the curre
 - [ ] Overlay permission onboarding (deferred — Phase 2 uses first-open day gate, not overlay)
 - [x] `MorningLockActivity` + evening review WorkManager reminder
 - [x] NFC enrollment + verification in Settings
-- [x] `DailyIntentActivity` with Top 3 + calendar blocks
+- [x] `DailyIntentActivity` with flexible plan (min 3 tasks) + calendar blocks
 - [x] `ReviewScreen` evening review form + local notification trigger
 - [x] `LifeLog` writes on unlock and review
 

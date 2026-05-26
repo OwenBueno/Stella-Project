@@ -18,7 +18,7 @@ Eliminate morning procrastination, enforce daily planning, and prevent critical 
 
 | Feature | Behavior |
 |---------|----------|
-| **Morning hostage** | Overlay locks distractions until NFC scan + Top 3 daily intent + calendar blocks |
+| **Morning hostage** | Overlay locks distractions until NFC scan + daily intent (3+ planned tasks) + calendar blocks |
 | **Aggressive assistant** | Scheduled tasks trigger full-screen takeover + repeating alarm until focus starts |
 | **Habit matrix** | Green = done, red = missed — no neutral gray on cells |
 | **Life record** | Tasks, events, evening reviews in one searchable history |
@@ -49,7 +49,7 @@ See [architecture/overview.md](architecture/overview.md).
 | Phase | Focus | Gate |
 |-------|-------|------|
 | **1** | Habit grid, tasks, calendar CRUD, sync | Offline grid + sync round-trip |
-| **2** | Morning lock, NFC, daily intent, evening review | Cannot skip morning flow |
+| **2** | Morning lock, NFC, daily intent (min 3 tasks), evening review | Cannot skip morning flow |
 | **3** | Exact alarms, takeover UI, FCM | Alarm fires on schedule; push works |
 
 Details: [implementation-roadmap.md](implementation-roadmap.md).

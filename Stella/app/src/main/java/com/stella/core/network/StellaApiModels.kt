@@ -4,6 +4,11 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
 @Serializable
+data class HealthResponse(
+    val status: String,
+)
+
+@Serializable
 data class SyncPushRequest(
     val deviceId: String,
     val pushedAt: String,
@@ -14,6 +19,8 @@ data class SyncPushRequest(
     val dailyIntents: List<SyncDailyIntentDto> = emptyList(),
     val eveningReviews: List<SyncEveningReviewDto> = emptyList(),
     val lifeLogs: List<SyncLifeLogDto> = emptyList(),
+    val transactions: List<SyncTransactionDto> = emptyList(),
+    val debts: List<SyncDebtDto> = emptyList(),
 )
 
 @Serializable
@@ -34,6 +41,7 @@ data class SyncCheckInDto(
     val date: String,
     val status: String,
     val updatedAt: String,
+    val completedAt: String? = null,
 )
 
 @Serializable
@@ -44,6 +52,7 @@ data class SyncTaskDto(
     val scheduledAt: String? = null,
     val durationMinutes: Int? = null,
     val status: String,
+    val sortOrder: Int = 0,
     val priority: String? = null,
     val createdAt: String,
     val updatedAt: String,
@@ -57,6 +66,8 @@ data class SyncEventDto(
     val startAt: String,
     val endAt: String,
     val linkedTaskId: String? = null,
+    val recurrenceRuleJson: String? = null,
+    val reminderOffsetsJson: String? = null,
     val createdAt: String,
     val updatedAt: String,
     val deletedAt: String? = null,
@@ -66,7 +77,7 @@ data class SyncEventDto(
 data class SyncDailyIntentDto(
     val id: String,
     val date: String,
-    val top3TaskIds: List<String>,
+    val plannedTaskIds: List<String>,
     val completedAt: String,
     val nfcTagId: String,
     val updatedAt: String,
@@ -93,6 +104,44 @@ data class SyncLifeLogDto(
 )
 
 @Serializable
+data class SyncTransactionDto(
+    val id: String,
+    val type: String,
+    val amount: Double,
+    val category: String,
+    val description: String? = null,
+    val date: String,
+    val linkedTaskId: String? = null,
+    val createdAt: String,
+    val updatedAt: String,
+    val deletedAt: String? = null,
+)
+
+@Serializable
+data class SyncDebtDto(
+    val id: String,
+    val contactName: String,
+    val direction: String,
+    val totalAmount: Double,
+    val remainingAmount: Double,
+    val dueDate: String? = null,
+    val notes: String? = null,
+    val isResolved: Boolean,
+    val createdAt: String,
+    val updatedAt: String,
+    val deletedAt: String? = null,
+)
+
+@Serializable
+data class FinanceSummaryResponse(
+    val ingress: Double,
+    val egress: Double,
+    val netBalance: Double,
+    val owedToMe: Double,
+    val owedByMe: Double,
+)
+
+@Serializable
 data class SyncPushResponse(
     val accepted: Int,
     val conflicts: List<SyncConflict> = emptyList(),
@@ -115,4 +164,6 @@ data class SyncPullResponse(
     val dailyIntents: List<SyncDailyIntentDto> = emptyList(),
     val eveningReviews: List<SyncEveningReviewDto> = emptyList(),
     val lifeLogs: List<SyncLifeLogDto> = emptyList(),
+    val transactions: List<SyncTransactionDto> = emptyList(),
+    val debts: List<SyncDebtDto> = emptyList(),
 )

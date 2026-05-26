@@ -1,153 +1,134 @@
 package com.stella.feature.tasks
 
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
-import com.stella.core.ui.components.stellaTextFieldColors
-import com.stella.core.ui.theme.TextSecondary
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.stella.core.data.TaskStatus
-import com.stella.core.database.entity.TaskEntity
-import com.stella.core.ui.components.StellaSectionHeader
-import com.stella.core.ui.theme.Border
-import com.stella.core.ui.theme.Error
+import com.stella.core.ui.theme.DawnGradientBottom
+import com.stella.core.ui.theme.DawnGradientTop
 import com.stella.core.ui.theme.Primary
-import com.stella.core.ui.theme.Success
+import com.stella.core.ui.theme.TextSecondary
 
 @Composable
 fun TasksScreen(
-    onTaskClick: (String) -> Unit,
+    initialEditTaskId: String? = null,
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    Column(
+    LaunchedEffect(initialEditTaskId) {
+        initialEditTaskId?.let { viewModel.onEvent(TasksUiEvent.OpenEditTask(it)) }
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        StellaSectionHeader(eyebrow = "Operations", title = "The Frontline")
-
-        OutlinedTextField(
-            value = state.newTaskTitle,
-            onValueChange = { viewModel.onEvent(TasksUiEvent.TitleChanged(it)) },
-            label = { Text("New directive") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            colors = stellaTextFieldColors(),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = { viewModel.onEvent(TasksUiEvent.AddForToday) }) {
-                Text("Today", color = Primary)
-            }
-            TextButton(onClick = { viewModel.onEvent(TasksUiEvent.AddForTomorrow) }) {
-                Text("Tomorrow", color = Primary)
-            }
-        }
-
-        TaskSection("Today", state.today, onTaskClick, viewModel)
-        TaskSection("Tomorrow", state.tomorrow, onTaskClick, viewModel)
-        TaskSection("Upcoming", state.upcoming, onTaskClick, viewModel)
-    }
-}
-
-@Composable
-private fun TaskSection(
-    title: String,
-    tasks: List<TaskEntity>,
-    onTaskClick: (String) -> Unit,
-    viewModel: TasksViewModel,
-) {
-    if (tasks.isEmpty()) return
-    Text(title.uppercase(), style = MaterialTheme.typography.labelMedium, color = Primary)
-    tasks.forEach { task ->
-        TaskRow(
-            task = task,
-            onClick = { onTaskClick(task.id) },
-            onToggle = { viewModel.onEvent(TasksUiEvent.ToggleStatus(task.id)) },
-            onDelete = { viewModel.onEvent(TasksUiEvent.Delete(task.id)) },
-        )
-    }
-}
-
-@Composable
-private fun TaskRow(
-    task: TaskEntity,
-    onClick: () -> Unit,
-    onToggle: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    val done = task.status == TaskStatus.DONE.name
-    val started = task.status == TaskStatus.IN_PROGRESS.name
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, Border)
-            .clickable(onClick = onClick)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .border(
-                    2.dp,
-                    when {
-                        done -> Success
-                        started -> Primary
-                        else -> Border
-                    },
-                )
-                .clickable(onClick = onToggle),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (done) Icon(Icons.Default.Check, null, tint = Primary, modifier = Modifier.size(16.dp))
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = task.title,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    textDecoration = if (done) TextDecoration.LineThrough else null,
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(DawnGradientTop, DawnGradientBottom),
                 ),
-                color = if (done) TextSecondary else MaterialTheme.colorScheme.onSurface,
-            )
-            task.scheduledAt?.let {
-                Text(it.take(16), style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            ),
+    ) {
+        if (state.isLoading) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Primary)
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                DirectiveComposer(
+                    expanded = state.composerExpanded,
+                    title = state.newTaskTitle,
+                    composerError = state.composerError,
+                    onExpand = { viewModel.onEvent(TasksUiEvent.ExpandComposer) },
+                    onTitleChange = { viewModel.onEvent(TasksUiEvent.TitleChanged(it)) },
+                    onAddToday = { viewModel.onEvent(TasksUiEvent.AddForToday) },
+                    onAddTomorrow = { viewModel.onEvent(TasksUiEvent.AddForTomorrow) },
+                )
+                FrontlineTabs(
+                    selectedTab = state.selectedTab,
+                    onSelectTab = { viewModel.onEvent(TasksUiEvent.SelectTab(it)) },
+                )
+                if (state.activeTasks.isEmpty() && state.completedTasks.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "No directives yet. Tap New directive to add one.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = TextSecondary,
+                        )
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        ReorderableActiveTaskList(
+                            tasks = state.activeTasks,
+                            onReorder = { from, to ->
+                                viewModel.onEvent(TasksUiEvent.ReorderActive(from, to))
+                            },
+                            onReorderCommitted = {
+                                viewModel.onEvent(TasksUiEvent.CommitReorder)
+                            },
+                            onEdit = { id -> viewModel.onEvent(TasksUiEvent.OpenEditTask(id)) },
+                            onToggle = { viewModel.onEvent(TasksUiEvent.ToggleStatus(it)) },
+                            onDelete = { viewModel.onEvent(TasksUiEvent.Delete(it)) },
+                            modifier = Modifier.weight(1f),
+                        )
+                        CompletedTaskList(
+                            tasks = state.completedTasks,
+                            onEdit = { id -> viewModel.onEvent(TasksUiEvent.OpenEditTask(id)) },
+                            onToggle = { viewModel.onEvent(TasksUiEvent.ToggleStatus(it)) },
+                            onDelete = { viewModel.onEvent(TasksUiEvent.Delete(it)) },
+                        )
+                    }
+                }
             }
         }
-        if (task.priority == "HIGH") {
-            Box(modifier = Modifier.size(8.dp).border(1.dp, Error))
-        }
-        IconButton(onClick = onDelete) {
-            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurface)
-        }
+    }
+
+    if (state.showSchedulePicker) {
+        val editingId = state.editingTaskId
+        SchedulePickerSheet(
+            mode = state.schedulePickerMode,
+            pickerDate = state.pickerDate,
+            pickerHour = state.pickerHour,
+            pickerMinute = state.pickerMinute,
+            editDraftTitle = state.editDraftTitle,
+            onEditTitleChange = { viewModel.onEvent(TasksUiEvent.EditDraftTitleChanged(it)) },
+            onDateChange = { viewModel.onEvent(TasksUiEvent.PickerDateChanged(it)) },
+            onHourChange = { viewModel.onEvent(TasksUiEvent.PickerHourChanged(it)) },
+            onMinuteChange = { viewModel.onEvent(TasksUiEvent.PickerMinuteChanged(it)) },
+            onConfirm = { viewModel.onEvent(TasksUiEvent.ConfirmSchedulePicker) },
+            onDismiss = { viewModel.onEvent(TasksUiEvent.DismissSchedulePicker) },
+            onDelete = if (editingId != null) {
+                { viewModel.onEvent(TasksUiEvent.Delete(editingId)) }
+            } else {
+                null
+            },
+        )
     }
 }

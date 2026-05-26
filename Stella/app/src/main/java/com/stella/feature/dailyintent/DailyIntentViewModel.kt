@@ -19,42 +19,63 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import javax.inject.Inject
 
-data class Top3Slot(
-    val index: Int,
-    val taskId: String?,
+data class PlannedTaskItem(
+    val taskId: String,
+    val title: String,
 )
 
 data class DailyIntentUiState(
-    val slots: List<Top3Slot> = listOf(
-        Top3Slot(0, null),
-        Top3Slot(1, null),
-        Top3Slot(2, null),
-    ),
+    val plannedTaskIds: List<String> = emptyList(),
     val tasks: List<TaskEntity> = emptyList(),
     val blockSchedules: Map<String, BlockSchedule> = emptyMap(),
-    val newTaskTitle: String = "",
+    val searchQuery: String = "",
     val timeZoneLabel: String = "",
     val defaultDurationMinutes: Int = 60,
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val error: String? = null,
+    val showInfoSheet: Boolean = false,
 ) {
-    val selectedTaskIds: List<String> = slots.mapNotNull { it.taskId }
-    val selectionCount: Int = selectedTaskIds.size
-    val canUnlock: Boolean = selectionCount == 3 && !isSaving
+    val plannedCount: Int = plannedTaskIds.size
+    val canUnlock: Boolean = plannedCount >= 3 && !isSaving
+
+    val plannedTasks: List<PlannedTaskItem>
+        get() = plannedTaskIds.mapNotNull { id ->
+            tasks.find { it.id == id }?.let { PlannedTaskItem(it.id, it.title) }
+        }
+
+    val filteredTasks: List<TaskEntity>
+        get() {
+            val query = searchQuery.trim()
+            val available = tasks.filter { it.id !in plannedTaskIds }
+            if (query.isEmpty()) return available
+            return available.filter { it.title.contains(query, ignoreCase = true) }
+        }
+
+    val canCreateFromQuery: Boolean
+        get() {
+            val query = searchQuery.trim()
+            if (query.isEmpty()) return false
+            return tasks.none { it.title.equals(query, ignoreCase = true) }
+        }
+
+    val createLabel: String
+        get() = "Create \"${searchQuery.trim()}\""
 
     fun taskForId(id: String): TaskEntity? = tasks.find { it.id == id }
 
-    fun scheduleFor(taskId: String?): BlockSchedule? = taskId?.let { blockSchedules[it] }
+    fun scheduleFor(taskId: String): BlockSchedule? = blockSchedules[taskId]
 }
 
 sealed interface DailyIntentUiEvent {
-    data class NewTaskTitleChanged(val title: String) : DailyIntentUiEvent
-    data object AddFrog : DailyIntentUiEvent
-    data class SelectTask(val taskId: String) : DailyIntentUiEvent
-    data class ClearSlot(val slotIndex: Int) : DailyIntentUiEvent
+    data class SearchQueryChanged(val query: String) : DailyIntentUiEvent
+    data object CreateTaskFromQuery : DailyIntentUiEvent
+    data class AddTaskToPlan(val taskId: String) : DailyIntentUiEvent
+    data class RemoveTaskFromPlan(val taskId: String) : DailyIntentUiEvent
     data class BlockHourChanged(val taskId: String, val hour: Int) : DailyIntentUiEvent
     data class BlockMinuteChanged(val taskId: String, val minute: Int) : DailyIntentUiEvent
+    data object ShowInfoSheet : DailyIntentUiEvent
+    data object DismissInfoSheet : DailyIntentUiEvent
     data object UnlockDay : DailyIntentUiEvent
 }
 
@@ -69,7 +90,6 @@ class DailyIntentViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(
         DailyIntentUiState(
-            timeZoneLabel = "",
             defaultDurationMinutes = settingsRepository.getBlockDurationMinutes(),
         ),
     )
@@ -88,15 +108,15 @@ class DailyIntentViewModel @Inject constructor(
                             .thenBy { it.title.lowercase() },
                     )
                 _state.update { current ->
+                    val merged = mergeBlockSchedules(
+                        plannedIds = current.plannedTaskIds,
+                        existing = current.blockSchedules,
+                        tasks = open,
+                    )
                     current.copy(
                         tasks = open,
                         isLoading = false,
-                        blockSchedules = mergeBlockSchedules(
-                            selectedIds = current.selectedTaskIds,
-                            slots = current.slots,
-                            existing = current.blockSchedules,
-                            tasks = open,
-                        ),
+                        blockSchedules = merged,
                     )
                 }
             }
@@ -105,13 +125,17 @@ class DailyIntentViewModel @Inject constructor(
 
     fun onEvent(event: DailyIntentUiEvent) {
         when (event) {
-            is DailyIntentUiEvent.NewTaskTitleChanged ->
-                _state.update { it.copy(newTaskTitle = event.title, error = null) }
-            DailyIntentUiEvent.AddFrog -> addFrog()
-            is DailyIntentUiEvent.SelectTask -> selectTask(event.taskId)
-            is DailyIntentUiEvent.ClearSlot -> clearSlot(event.slotIndex)
-            is DailyIntentUiEvent.BlockHourChanged -> updateSchedule(event.taskId) { it.copy(hour = event.hour.coerceIn(0, 23)) }
-            is DailyIntentUiEvent.BlockMinuteChanged -> updateSchedule(event.taskId) { it.copy(minute = event.minute.coerceIn(0, 59)) }
+            is DailyIntentUiEvent.SearchQueryChanged ->
+                _state.update { it.copy(searchQuery = event.query, error = null) }
+            DailyIntentUiEvent.CreateTaskFromQuery -> createTaskFromQuery()
+            is DailyIntentUiEvent.AddTaskToPlan -> addTaskToPlan(event.taskId)
+            is DailyIntentUiEvent.RemoveTaskFromPlan -> removeTaskFromPlan(event.taskId)
+            is DailyIntentUiEvent.BlockHourChanged ->
+                updateSchedule(event.taskId) { it.copy(hour = event.hour.coerceIn(0, 23)) }
+            is DailyIntentUiEvent.BlockMinuteChanged ->
+                updateSchedule(event.taskId) { it.copy(minute = event.minute.coerceIn(0, 59)) }
+            DailyIntentUiEvent.ShowInfoSheet -> _state.update { it.copy(showInfoSheet = true) }
+            DailyIntentUiEvent.DismissInfoSheet -> _state.update { it.copy(showInfoSheet = false) }
             DailyIntentUiEvent.UnlockDay -> unlockDay()
         }
     }
@@ -127,82 +151,67 @@ class DailyIntentViewModel @Inject constructor(
 
     private fun updateSchedule(taskId: String, transform: (BlockSchedule) -> BlockSchedule) {
         _state.update { current ->
-            val existing = current.blockSchedules[taskId] ?: defaultScheduleForSlot(
-                current.slots.indexOfFirst { it.taskId == taskId }.coerceAtLeast(0),
-            )
+            val index = current.plannedTaskIds.indexOf(taskId).coerceAtLeast(0)
+            val existing = current.blockSchedules[taskId] ?: defaultScheduleForIndex(index)
+            val updated = transform(existing)
             current.copy(
-                blockSchedules = current.blockSchedules + (taskId to transform(existing)),
+                blockSchedules = current.blockSchedules + (taskId to updated),
                 error = null,
             )
         }
     }
 
-    private fun addFrog() {
-        val title = _state.value.newTaskTitle.trim()
+    private fun createTaskFromQuery() {
+        val title = _state.value.searchQuery.trim()
         if (title.isEmpty()) {
-            _state.update { it.copy(error = "Enter a task name to add a frog.") }
+            _state.update { it.copy(error = "Enter a task name to create.") }
             return
         }
+        if (!_state.value.canCreateFromQuery) return
         viewModelScope.launch {
-            val defaults = settingsRepository.getBlockScheduleForSlot(0)
+            val index = _state.value.plannedTaskIds.size
+            val schedule = defaultScheduleForIndex(index)
             val today = timeService.today()
-            val scheduledAt = timeService.toInstantIso(today, defaults.hour, defaults.minute)
-            taskRepository.addTask(title, scheduledAt)
-            _state.update { it.copy(newTaskTitle = "", error = null) }
+            val scheduledAt = timeService.toInstantIso(today, schedule.hour, schedule.minute)
+            val newId = taskRepository.addTask(title, scheduledAt)
+            addTaskToPlanInternal(newId, clearSearch = true)
         }
     }
 
-    private fun selectTask(taskId: String) {
+    private fun addTaskToPlan(taskId: String) {
+        if (taskId in _state.value.plannedTaskIds) return
+        addTaskToPlanInternal(taskId, clearSearch = false)
+    }
+
+    private fun addTaskToPlanInternal(taskId: String, clearSearch: Boolean) {
         _state.update { current ->
-            val inSlot = current.slots.indexOfFirst { it.taskId == taskId }
-            if (inSlot >= 0) {
-                val newSlots = current.slots.mapIndexed { i, slot ->
-                    if (i == inSlot) slot.copy(taskId = null) else slot
-                }
-                return@update current.copy(
-                    slots = newSlots,
-                    blockSchedules = mergeBlockSchedules(
-                        selectedIds = newSlots.mapNotNull { it.taskId },
-                        slots = newSlots,
-                        existing = current.blockSchedules,
-                        tasks = current.tasks,
-                    ),
-                    error = null,
-                )
-            }
-            val emptyIndex = current.slots.indexOfFirst { it.taskId == null }
-            if (emptyIndex < 0) {
-                return@update current.copy(error = "Top 3 is full. Clear a slot or tap a selected task to remove it.")
-            }
-            val newSlots = current.slots.mapIndexed { i, slot ->
-                if (i == emptyIndex) slot.copy(taskId = taskId) else slot
-            }
+            if (taskId in current.plannedTaskIds) return@update current
+            val newPlanned = current.plannedTaskIds + taskId
+            val merged = mergeBlockSchedules(
+                plannedIds = newPlanned,
+                existing = current.blockSchedules,
+                tasks = current.tasks,
+            )
             current.copy(
-                slots = newSlots,
-                blockSchedules = mergeBlockSchedules(
-                    selectedIds = newSlots.mapNotNull { it.taskId },
-                    slots = newSlots,
-                    existing = current.blockSchedules,
-                    tasks = current.tasks,
-                ),
+                plannedTaskIds = newPlanned,
+                searchQuery = if (clearSearch) "" else current.searchQuery,
+                blockSchedules = merged,
                 error = null,
             )
         }
     }
 
-    private fun clearSlot(slotIndex: Int) {
+    private fun removeTaskFromPlan(taskId: String) {
         _state.update { current ->
-            val newSlots = current.slots.mapIndexed { i, slot ->
-                if (i == slotIndex) slot.copy(taskId = null) else slot
-            }
+            val newPlanned = current.plannedTaskIds.filter { it != taskId }
+            val merged = mergeBlockSchedules(
+                plannedIds = newPlanned,
+                existing = current.blockSchedules,
+                tasks = current.tasks,
+            )
             current.copy(
-                slots = newSlots,
-                blockSchedules = mergeBlockSchedules(
-                    selectedIds = newSlots.mapNotNull { it.taskId },
-                    slots = newSlots,
-                    existing = current.blockSchedules,
-                    tasks = current.tasks,
-                ),
+                plannedTaskIds = newPlanned,
+                blockSchedules = merged,
                 error = null,
             )
         }
@@ -210,9 +219,9 @@ class DailyIntentViewModel @Inject constructor(
 
     private fun unlockDay() {
         val current = _state.value
-        if (current.selectionCount != 3) {
+        if (current.plannedCount < 3) {
             _state.update {
-                it.copy(error = "Assign exactly 3 tasks to your Top 3 slots (${it.selectionCount}/3).")
+                it.copy(error = "Add at least 3 tasks to start your day (${it.plannedCount}/3).")
             }
             return
         }
@@ -221,10 +230,10 @@ class DailyIntentViewModel @Inject constructor(
             try {
                 val today = timeService.today()
                 val now = Instant.now().toString()
-                current.selectedTaskIds.forEach { taskId ->
-                    val task = current.taskForId(taskId) ?: return@forEach
+                current.plannedTaskIds.forEachIndexed { index, taskId ->
+                    val task = current.taskForId(taskId) ?: return@forEachIndexed
                     val schedule = current.blockSchedules[taskId]
-                        ?: defaultScheduleForSlot(current.selectedTaskIds.indexOf(taskId))
+                        ?: defaultScheduleForIndex(index)
                     val startIso = timeService.toInstantIso(today, schedule.hour, schedule.minute)
                     val endInstant = Instant.parse(startIso).plusSeconds(schedule.durationMinutes * 60L)
                     calendarRepository.addEvent(
@@ -243,7 +252,7 @@ class DailyIntentViewModel @Inject constructor(
                     )
                 }
                 val nfcTagId = settingsRepository.getNfcTagId() ?: SettingsRepository.DEBUG_NFC_TAG
-                val intentId = dailyIntentRepository.saveIntent(current.selectedTaskIds, nfcTagId)
+                val intentId = dailyIntentRepository.saveIntent(current.plannedTaskIds, nfcTagId)
                 lifeLogWriter.logMorningUnlock(intentId, nfcTagId)
                 onUnlocked?.invoke()
             } catch (e: Exception) {
@@ -253,15 +262,16 @@ class DailyIntentViewModel @Inject constructor(
     }
 
     private fun mergeBlockSchedules(
-        selectedIds: List<String>,
-        slots: List<Top3Slot>,
+        plannedIds: List<String>,
         existing: Map<String, BlockSchedule>,
         tasks: List<TaskEntity>,
-    ): Map<String, BlockSchedule> = selectedIds.associateWith { taskId ->
-        existing[taskId]
-            ?: scheduleFromTask(taskId, tasks)
-            ?: defaultScheduleForSlot(slots.indexOfFirst { it.taskId == taskId }.coerceAtLeast(0))
-    }
+    ): Map<String, BlockSchedule> = plannedIds.mapIndexed { index, taskId ->
+        taskId to (
+            existing[taskId]
+                ?: scheduleFromTask(taskId, tasks)
+                ?: defaultScheduleForIndex(index)
+            )
+    }.toMap()
 
     private fun scheduleFromTask(taskId: String, tasks: List<TaskEntity>): BlockSchedule? {
         val task = tasks.find { it.id == taskId } ?: return null
@@ -273,11 +283,14 @@ class DailyIntentViewModel @Inject constructor(
         )
     }
 
-    private fun defaultScheduleForSlot(slotIndex: Int): BlockSchedule {
-        val defaults = settingsRepository.getBlockScheduleForSlot(slotIndex.coerceIn(0, 2))
+    private fun defaultScheduleForIndex(index: Int): BlockSchedule {
+        val defaults = settingsRepository.getDefaultTaskSchedule()
+        val offsetMinutes = index * defaults.durationMinutes
+        val totalMinutes = defaults.hour * 60 + defaults.minute + offsetMinutes
+        val capped = totalMinutes.coerceAtMost(22 * 60 + 59)
         return BlockSchedule(
-            hour = defaults.hour,
-            minute = defaults.minute,
+            hour = capped / 60,
+            minute = capped % 60,
             durationMinutes = defaults.durationMinutes,
         )
     }

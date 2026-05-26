@@ -8,10 +8,11 @@ Entities are stored in **Room** (Android) and **MongoDB** (server) with matching
 erDiagram
   Habit ||--o{ HabitCheckIn : has
   Task ||--o| CalendarEvent : links
-  DailyIntent }o--o{ Task : top3
+  DailyIntent }o--o{ Task : planned
   EveningReview ||--|| HabitGridSnapshot : embeds
   LifeLog }o--|| Habit : optional
   LifeLog }o--|| Task : optional
+  Task ||--o{ Transaction : penalty
 ```
 
 ## Habit
@@ -72,6 +73,8 @@ Stella-owned calendar only (no external sync).
 | `startAt` | ISO-8601 | yes | |
 | `endAt` | ISO-8601 | yes | |
 | `linkedTaskId` | UUID string | no | |
+| `recurrenceRuleJson` | string (JSON) | no | `RecurrenceRule` (NONE, DAILY, WEEKLY, MONTHLY, YEARLY, CUSTOM) |
+| `reminderOffsetsJson` | string (JSON) | no | Minutes before start, e.g. `[0, 15, 1440]` |
 | `createdAt` | ISO-8601 | yes | |
 | `updatedAt` | ISO-8601 | yes | |
 | `deletedAt` | ISO-8601 | no | |
@@ -82,7 +85,7 @@ Stella-owned calendar only (no external sync).
 |-------|------|----------|-------|
 | `id` | UUID string | yes | |
 | `date` | string | yes | `YYYY-MM-DD` |
-| `top3TaskIds` | string[] | yes | Exactly 3 task ids |
+| `plannedTaskIds` | string[] | yes | Min 3 task ids; no maximum |
 | `completedAt` | ISO-8601 | yes | Morning unlock timestamp |
 | `nfcTagId` | string | yes | Scanned tag identifier |
 | `updatedAt` | ISO-8601 | yes | |
@@ -134,6 +137,40 @@ Append-heavy audit trail for searchable history.
 | `HABIT_CHECKIN` | `{ habitId, date, status }` |
 | `EVENING_REVIEW` | `{ eveningReviewId }` |
 | `SYNC` | `{ direction, counts }` |
+| `PENALTY_CHARGED` | `{ taskId, amountCents }` (planned) |
+
+## Transaction
+
+Single-entry cash-flow ledger (ingress/egress).
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `id` | UUID string | yes | |
+| `type` | enum | yes | `ingress` \| `egress` |
+| `amount` | number | yes | |
+| `category` | string | yes | e.g. Salary, Food, Penalty |
+| `description` | string | no | |
+| `date` | ISO-8601 | yes | |
+| `linkedTaskId` | UUID string | no | Penalty link |
+| `createdAt` | ISO-8601 | yes | |
+| `updatedAt` | ISO-8601 | yes | |
+| `deletedAt` | ISO-8601 | no | |
+
+## Debt
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `id` | UUID string | yes | |
+| `contactName` | string | yes | |
+| `direction` | enum | yes | `owed_to_me` \| `owed_by_me` |
+| `totalAmount` | number | yes | |
+| `remainingAmount` | number | yes | |
+| `dueDate` | ISO-8601 | no | |
+| `notes` | string | no | |
+| `isResolved` | boolean | yes | |
+| `createdAt` | ISO-8601 | yes | |
+| `updatedAt` | ISO-8601 | yes | |
+| `deletedAt` | ISO-8601 | no | |
 
 ## SyncMeta (Room only)
 
@@ -167,6 +204,8 @@ Schemas live in `server/src/database/schemas/`. MongoDB collection names match p
 | EveningReview | `EveningReview` |
 | LifeLog | `LifeLog` |
 | DeviceToken | `DeviceToken` |
+| Transaction | `Transaction` |
+| Debt | `Debt` |
 
 - `_id`: String UUID (same value as API `id`)
 - `habitGridSnapshot` / `payload`: `Schema.Types.Mixed`
@@ -175,7 +214,8 @@ Schemas live in `server/src/database/schemas/`. MongoDB collection names match p
 ## Room database
 
 - Database name: `stella.db`
-- Versioning: incremental migrations per entity
+- Version: **8** (includes `transactions`, `debts` tables)
+- Versioning: destructive migration until explicit migrations land
 - All entities include `needsSync: Boolean` default `true` on local mutation (cleared after successful push)
 
 ## Related

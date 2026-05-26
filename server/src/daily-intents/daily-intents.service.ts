@@ -25,7 +25,7 @@ export class DailyIntentsService {
         {
           _id: dto.id,
           date: dto.date,
-          top3TaskIds: dto.top3TaskIds,
+          plannedTaskIds: dto.plannedTaskIds,
           completedAt: new Date(dto.completedAt),
           nfcTagId: dto.nfcTagId,
           updatedAt: new Date(dto.updatedAt),

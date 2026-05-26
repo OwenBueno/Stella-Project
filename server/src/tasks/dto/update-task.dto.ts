@@ -30,6 +30,10 @@ export class UpdateTaskDto {
   status?: string;
 
   @IsOptional()
+  @IsInt()
+  sortOrder?: number;
+
+  @IsOptional()
   @IsIn(['LOW', 'MEDIUM', 'HIGH'])
   priority?: string | null;
 

@@ -21,6 +21,12 @@ export class CalendarEvent {
   @Prop({ type: String, default: null })
   linkedTaskId!: string | null;
 
+  @Prop({ type: String, default: null })
+  recurrenceRuleJson!: string | null;
+
+  @Prop({ type: String, default: null })
+  reminderOffsetsJson!: string | null;
+
   @Prop({ type: Date, required: true })
   createdAt!: Date;
 

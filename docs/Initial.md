@@ -8,7 +8,7 @@ To fix the "morning mess" and "evening rush," the app needs to force a routine t
 *   **The Feature:** When your morning alarm goes off, the app locks your phone using Android's `SYSTEM_ALERT_WINDOW` (draw over other apps). You cannot access Instagram, email, or browser. 
 *   **The Unlock Condition:** To unlock your phone for the day, you must:
     1. Scan an NFC tag or Barcode in your bathroom (forces you out of bed).
-    2. Fill out your **Daily Intent**: Pick your "Top 3 Frogs" (the hard tasks you usually avoid until evening).
+    2. Fill out your **Daily Intent**: Plan at least 3 tasks for today (existing or new); add more if you want.
     3. Block out your calendar for those tasks.
 *   **Result:** Your morning is instantly structured before you are allowed to consume any dopamine.
 
@@ -64,7 +64,7 @@ Don't try to build the whole Life OS at once. Build it in layers:
     *   *Node:* Setup PostgreSQL, Prisma, and basic CRUD APIs for Tasks and Habits.
     *   *Android:* Build the MVVM + Compose UI. Create the Daily Visual Habit Sheet and the Todo list.
 *   **Phase 2: The Morning Hostage & Evening Review (Weeks 3-4)**
-    *   *Android:* Implement the `SYSTEM_ALERT_WINDOW` logic. Build the morning screen that forces you to pick your Top 3 tasks for the day.
+    *   *Android:* Implement the `SYSTEM_ALERT_WINDOW` logic. Build the morning screen that forces you to plan at least 3 tasks for the day.
     *   *Node:* Add an endpoint that saves the "Evening Review" text/voice note.
 *   **Phase 3: The Aggressive Assistant (Weeks 5-6)**
     *   *Android:* Implement Exact Alarms and full-screen popups for scheduled tasks.

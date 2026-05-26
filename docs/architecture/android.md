@@ -54,7 +54,7 @@ com.stella/
 │   ├── tasks/
 │   ├── calendar/
 │   ├── morning/                   # MorningLockActivity
-│   ├── dailyintent/               # DailyIntentActivity (Top 3 + blocks)
+│   ├── dailyintent/               # DailyIntentActivity (planned tasks + blocks)
 │   ├── nfc/                       # NfcEnrollmentActivity
 │   ├── review/                    # Evening review (ReviewScreen)
 │   ├── focus/                     # Phase 3
@@ -114,11 +114,14 @@ Single `MainActivity` hosts `StellaNavHost`:
 |-------|--------|
 | `home` | Today summary |
 | `habits` | Full habit grid |
-| `tasks` | Task list |
-| `tasks/{id}` | Task detail |
-| `calendar` | Day view |
+| `tasks` | Frontline (task list + edit sheet) |
+| `tasks?editTaskId={id}` | Frontline with edit sheet open |
+| `calendar` | Temporal Grid (monthly) |
+| `calendar?openDate={date}` | Temporal Grid with day sheet |
 | `review` | Evening review form + habit snapshot |
-| `settings` | API key, NFC enrollment, evening reminder time |
+| `settings` | Settings hub (timezone, schedule defaults) |
+| `settings/advanced` | API credentials, NFC enrollment |
+| `settings/diagnostics` | Dev triggers, sync, purge |
 
 Enforcement screens (morning lock, task takeover) may use separate `Activity` entries for full-screen/intent reliability — see [../android/permissions-and-apis.md](../android/permissions-and-apis.md).
 
@@ -136,7 +139,7 @@ Enforcement screens (morning lock, task takeover) may use separate `Activity` en
 | Phase | Components |
 |-------|------------|
 | 1 | Room, NavHost, Habits/Tasks/Calendar MVI, SyncWorker |
-| 2 | `MorningLockActivity`, `DailyIntentActivity`, `NfcEnrollmentActivity`, `ReviewScreen`, `LifeLogWriter`, `EveningReviewScheduler` |
+| 2 | `MorningLockActivity`, `MorningLockSetupActivity`, `MorningLockEnforcementService`, `MorningAlarmScheduler`, `DailyIntentActivity`, `NfcEnrollmentActivity`, `ReviewScreen`, `LifeLogWriter`, `EveningReviewScheduler` |
 | 3 | `TaskTakeoverActivity`, `AlarmReceiver`, `FocusForegroundService`, FCM service |
 
 ## Testing strategy

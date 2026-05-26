@@ -14,15 +14,25 @@ import javax.inject.Singleton
 
 enum class CheckInStatus { DONE, MISSED }
 
+data class CheckInUi(
+    val status: CheckInStatus,
+    val completedAt: String?,
+)
+
 data class HabitWithCheckIns(
     val habit: HabitEntity,
-    val checkIns: Map<String, CheckInStatus>,
+    val checkIns: Map<String, CheckInUi>,
 )
 
 @Singleton
 class HabitRepository @Inject constructor(
     private val habitDao: HabitDao,
 ) {
+    fun observeActiveHabits(): Flow<List<HabitEntity>> = habitDao.observeActiveHabits()
+
+    fun observeCheckIns(fromDate: String, toDate: String): Flow<List<HabitCheckInEntity>> =
+        habitDao.observeCheckIns(fromDate, toDate)
+
     fun observeHabitsWithCheckIns(
         weekStart: LocalDate,
         days: Int = 7,
@@ -36,7 +46,12 @@ class HabitRepository @Inject constructor(
             habits.map { habit ->
                 val byDate = checkIns
                     .filter { it.habitId == habit.id }
-                    .associate { it.date to CheckInStatus.valueOf(it.status) }
+                    .associate {
+                        it.date to CheckInUi(
+                            status = CheckInStatus.valueOf(it.status),
+                            completedAt = it.completedAt,
+                        )
+                    }
                 HabitWithCheckIns(habit, byDate)
             }
         }
@@ -57,21 +72,46 @@ class HabitRepository @Inject constructor(
         )
     }
 
+    suspend fun updateHabitName(habitId: String, name: String) {
+        val habit = habitDao.getHabit(habitId) ?: return
+        val now = Instant.now().toString()
+        habitDao.upsertHabit(
+            habit.copy(
+                name = name.trim(),
+                updatedAt = now,
+                needsSync = true,
+            ),
+        )
+    }
+
+    suspend fun deleteHabit(habitId: String) {
+        val habit = habitDao.getHabit(habitId) ?: return
+        val now = Instant.now().toString()
+        habitDao.upsertHabit(
+            habit.copy(
+                active = false,
+                deletedAt = now,
+                updatedAt = now,
+                needsSync = true,
+            ),
+        )
+    }
+
     suspend fun toggleCheckIn(habitId: String, date: LocalDate) {
         val dateStr = DateUtils.formatDate(date)
         val existing = habitDao.getCheckIn(habitId, dateStr)
-        val now = Instant.now().toString()
-        val newStatus = when (existing?.status) {
-            CheckInStatus.DONE.name -> CheckInStatus.MISSED.name
-            CheckInStatus.MISSED.name -> CheckInStatus.DONE.name
-            else -> CheckInStatus.DONE.name
+        if (existing?.status == CheckInStatus.DONE.name) {
+            habitDao.deleteCheckIn(habitId, dateStr)
+            return
         }
+        val now = Instant.now().toString()
         habitDao.upsertCheckIn(
             HabitCheckInEntity(
                 id = existing?.id ?: UUID.randomUUID().toString(),
                 habitId = habitId,
                 date = dateStr,
-                status = newStatus,
+                status = CheckInStatus.DONE.name,
+                completedAt = now,
                 updatedAt = now,
                 needsSync = true,
             ),
@@ -82,12 +122,14 @@ class HabitRepository @Inject constructor(
         val dateStr = DateUtils.formatDate(date)
         val existing = habitDao.getCheckIn(habitId, dateStr)
         val now = Instant.now().toString()
+        val completedAt = if (status == CheckInStatus.DONE) now else null
         habitDao.upsertCheckIn(
             HabitCheckInEntity(
                 id = existing?.id ?: UUID.randomUUID().toString(),
                 habitId = habitId,
                 date = dateStr,
                 status = status.name,
+                completedAt = completedAt,
                 updatedAt = now,
                 needsSync = true,
             ),

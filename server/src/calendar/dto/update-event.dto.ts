@@ -18,6 +18,14 @@ export class UpdateEventDto {
   linkedTaskId?: string | null;
 
   @IsOptional()
+  @IsString()
+  recurrenceRuleJson?: string | null;
+
+  @IsOptional()
+  @IsString()
+  reminderOffsetsJson?: string | null;
+
+  @IsOptional()
   @IsISO8601()
   updatedAt?: string;
 

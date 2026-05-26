@@ -13,7 +13,7 @@ export class DailyIntent {
   date!: string;
 
   @Prop({ type: [String], required: true })
-  top3TaskIds!: string[];
+  plannedTaskIds!: string[];
 
   @Prop({ type: Date, required: true })
   completedAt!: Date;

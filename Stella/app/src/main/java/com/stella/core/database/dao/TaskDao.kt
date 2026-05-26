@@ -9,8 +9,30 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TaskDao {
-    @Query("SELECT * FROM tasks WHERE deletedAt IS NULL ORDER BY scheduledAt ASC")
+    @Query(
+        """
+        SELECT * FROM tasks WHERE deletedAt IS NULL AND status != 'DONE'
+        ORDER BY sortOrder ASC, scheduledAt ASC
+        """,
+    )
     fun observeActiveTasks(): Flow<List<TaskEntity>>
+
+    @Query(
+        """
+        SELECT * FROM tasks WHERE deletedAt IS NULL AND status = 'DONE'
+        ORDER BY updatedAt DESC
+        """,
+    )
+    fun observeCompletedTasks(): Flow<List<TaskEntity>>
+
+    @Query(
+        """
+        SELECT * FROM tasks WHERE deletedAt IS NULL AND status = 'DONE'
+        AND updatedAt >= :fromIso AND updatedAt <= :toIso
+        ORDER BY updatedAt ASC
+        """,
+    )
+    fun observeCompletedInRange(fromIso: String, toIso: String): Flow<List<TaskEntity>>
 
     @Query("SELECT * FROM tasks WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): TaskEntity?

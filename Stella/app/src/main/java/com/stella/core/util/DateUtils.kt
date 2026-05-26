@@ -1,7 +1,9 @@
 package com.stella.core.util
 
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.time.temporal.TemporalAdjusters
 
 object DateUtils {
     val isoDate: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
@@ -16,4 +18,9 @@ object DateUtils {
 
     fun weekDates(weekStart: LocalDate, days: Int = 7): List<LocalDate> =
         (0 until days).map { weekStart.plusDays(it.toLong()) }
+
+    fun mondayWeekStart(anchor: LocalDate): LocalDate =
+        anchor.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+
+    val mondayDayHeaders: List<String> = listOf("M", "T", "W", "T", "F", "S", "S")
 }

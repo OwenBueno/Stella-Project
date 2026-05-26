@@ -21,6 +21,9 @@ interface EveningReviewDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: EveningReviewEntity)
 
+    @Query("DELETE FROM evening_reviews WHERE date = :date")
+    suspend fun deleteByDate(date: String)
+
     @Query("DELETE FROM evening_reviews")
     suspend fun deleteAll()
 }

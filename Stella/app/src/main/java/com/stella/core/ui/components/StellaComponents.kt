@@ -4,8 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -24,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -31,12 +34,38 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.stella.core.ui.theme.Border
+import com.stella.core.ui.theme.DawnCardBorder
+import com.stella.core.ui.theme.DawnCardSurface
+import com.stella.core.ui.theme.DawnGradientBottom
+import com.stella.core.ui.theme.DawnGradientTop
 import com.stella.core.ui.theme.Divider
 import com.stella.core.ui.theme.Primary
-import com.stella.core.ui.theme.SurfaceCard
 import com.stella.core.ui.theme.TextPrimary
 import com.stella.core.ui.theme.TextSecondary
+
+private val DawnCardShape = RoundedCornerShape(12.dp)
+
+data class StellaScreenHeader(
+    val eyebrow: String,
+    val title: String,
+)
+
+@Composable
+fun DawnScreenBackground(
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(DawnGradientTop, DawnGradientBottom),
+                ),
+            ),
+        content = content,
+    )
+}
 
 @Composable
 fun StellaLabel(
@@ -105,9 +134,9 @@ fun StellaCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(4.dp))
-            .background(SurfaceCard)
-            .border(1.dp, Border, RoundedCornerShape(4.dp))
+            .clip(DawnCardShape)
+            .background(DawnCardSurface)
+            .border(1.dp, DawnCardBorder, DawnCardShape)
             .padding(16.dp),
     ) {
         content()
@@ -133,55 +162,61 @@ fun StellaStatCard(
 
 @Composable
 fun StellaTopBar(
-    statusText: String = "ONLINE",
+    header: StellaScreenHeader,
     modifier: Modifier = Modifier,
     showMenu: Boolean = true,
     onMenuClick: () -> Unit = {},
     showBack: Boolean = false,
     onBack: () -> Unit = {},
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(DawnGradientTop),
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .padding(horizontal = 8.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            when {
+                showBack -> {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = TextPrimary,
+                        )
+                    }
+                }
+                showMenu -> {
+                    IconButton(onClick = onMenuClick) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Open menu",
+                            tint = TextPrimary,
+                        )
+                    }
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = if (showBack || showMenu) 0.dp else 8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                when {
-                    showBack -> {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
-                    showMenu -> {
-                        IconButton(onClick = onMenuClick) {
-                            Icon(
-                                imageVector = Icons.Default.Menu,
-                                contentDescription = "Open menu",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
-                }
-                Column(modifier = Modifier.padding(start = if (showBack || showMenu) 0.dp else 16.dp)) {
-                    Text(
-                        text = "STELLA",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 4.sp,
-                        ),
-                    )
-                    StellaLabel(text = statusText, accent = true)
-                }
+                StellaLabel(text = header.eyebrow)
+                Text(
+                    text = header.title,
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-0.5).sp,
+                    ),
+                    color = TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
         Box(
@@ -238,7 +273,7 @@ fun stellaTextFieldColors(): TextFieldColors = OutlinedTextFieldDefaults.colors(
     focusedTextColor = TextPrimary,
     unfocusedTextColor = TextPrimary,
     focusedBorderColor = Primary,
-    unfocusedBorderColor = Divider,
+    unfocusedBorderColor = DawnCardBorder,
     focusedLabelColor = Primary,
     unfocusedLabelColor = TextSecondary,
     cursorColor = Primary,

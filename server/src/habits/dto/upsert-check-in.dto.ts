@@ -1,4 +1,4 @@
-import { IsIn, IsISO8601, IsString, IsUUID } from 'class-validator';
+import { IsIn, IsISO8601, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class UpsertCheckInDto {
   @IsUUID()
@@ -12,6 +12,10 @@ export class UpsertCheckInDto {
 
   @IsIn(['DONE', 'MISSED'])
   status!: string;
+
+  @IsOptional()
+  @IsISO8601()
+  completedAt?: string;
 
   @IsISO8601()
   updatedAt!: string;

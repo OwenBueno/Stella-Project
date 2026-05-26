@@ -18,6 +18,15 @@ interface CalendarEventDao {
     )
     fun observeInRange(from: String, to: String): Flow<List<CalendarEventEntity>>
 
+    @Query("SELECT * FROM calendar_events WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): CalendarEventEntity?
+
+    @Query("SELECT * FROM calendar_events WHERE deletedAt IS NULL")
+    fun observeAllActive(): Flow<List<CalendarEventEntity>>
+
+    @Query("SELECT * FROM calendar_events WHERE deletedAt IS NULL")
+    suspend fun getAllActive(): List<CalendarEventEntity>
+
     @Query("SELECT * FROM calendar_events WHERE needsSync = 1")
     suspend fun getNeedingSync(): List<CalendarEventEntity>
 

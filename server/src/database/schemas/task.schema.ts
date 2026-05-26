@@ -24,6 +24,9 @@ export class Task {
   @Prop({ required: true })
   status!: string;
 
+  @Prop({ type: Number, default: 0 })
+  sortOrder!: number;
+
   @Prop({ type: String, default: null })
   priority!: string | null;
 

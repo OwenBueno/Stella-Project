@@ -83,11 +83,21 @@ export class HabitsService {
     const existing = await this.checkInModel
       .findOne({ habitId, date: dto.date })
       .exec();
+    const completedAt =
+      dto.status === 'DONE' && dto.completedAt
+        ? new Date(dto.completedAt)
+        : dto.status === 'DONE'
+          ? new Date(dto.updatedAt)
+          : null;
     if (existing) {
       const doc = await this.checkInModel
         .findOneAndUpdate(
           { _id: existing._id },
-          { status: dto.status, updatedAt: new Date(dto.updatedAt) },
+          {
+            status: dto.status,
+            completedAt,
+            updatedAt: new Date(dto.updatedAt),
+          },
           { new: true },
         )
         .exec();
@@ -98,6 +108,7 @@ export class HabitsService {
       habitId,
       date: dto.date,
       status: dto.status,
+      completedAt,
       updatedAt: new Date(dto.updatedAt),
     });
     return mapDoc(doc)!;

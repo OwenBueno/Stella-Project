@@ -48,6 +48,14 @@ docker compose -f infra/docker-compose.yml up -d --build
 
 See [docs/deployment.md](docs/deployment.md) for GCP VM, Atlas IP allowlist, and TLS (certbot + `infra/nginx.conf` HTTPS block).
 
+## Core features
+
+### Financial tracking (Ingress, Egress, & Debts)
+
+- **Offline-first ledger**: Log income/expense transactions locally; syncs via bulk `SyncWorker`.
+- **Debt ledger**: Track outstanding receivables and payables with resolve actions.
+- **Penalty integration**: Optional skip-penalty egress linked to task IDs (Stripe charging remains deferred per ADR 006).
+
 ## Phase 1 exit gates (manual)
 
 | Gate | How to verify |

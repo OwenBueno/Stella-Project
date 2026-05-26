@@ -5,11 +5,13 @@ import androidx.room.Room
 import com.stella.core.database.StellaDatabase
 import com.stella.core.database.dao.CalendarEventDao
 import com.stella.core.database.dao.DailyIntentDao
+import com.stella.core.database.dao.DebtDao
 import com.stella.core.database.dao.EveningReviewDao
 import com.stella.core.database.dao.HabitDao
 import com.stella.core.database.dao.LifeLogDao
 import com.stella.core.database.dao.SyncMetaDao
 import com.stella.core.database.dao.TaskDao
+import com.stella.core.database.dao.TransactionDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -49,4 +51,10 @@ object DatabaseModule {
 
     @Provides
     fun provideLifeLogDao(database: StellaDatabase): LifeLogDao = database.lifeLogDao()
+
+    @Provides
+    fun provideTransactionDao(database: StellaDatabase): TransactionDao = database.transactionDao()
+
+    @Provides
+    fun provideDebtDao(database: StellaDatabase): DebtDao = database.debtDao()
 }
