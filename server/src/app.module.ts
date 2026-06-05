@@ -8,6 +8,9 @@ import { HealthController } from './health/health.controller';
 import { DailyIntentsModule } from './daily-intents/daily-intents.module';
 import { EveningReviewsModule } from './evening-reviews/evening-reviews.module';
 import { FinancesModule } from './finances/finances.module';
+import { AiModule } from './ai/ai.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { LifeLogsModule } from './life-logs/life-logs.module';
 import { SyncModule } from './sync/sync.module';
 import { TasksModule } from './tasks/tasks.module';
 
@@ -21,6 +24,9 @@ import { TasksModule } from './tasks/tasks.module';
     DailyIntentsModule,
     EveningReviewsModule,
     FinancesModule,
+    LifeLogsModule,
+    NotificationsModule,
+    AiModule,
   ],
   controllers: [HealthController],
   providers: [

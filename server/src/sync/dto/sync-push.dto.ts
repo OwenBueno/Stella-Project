@@ -6,6 +6,7 @@ import {
   IsInt,
   IsISO8601,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -117,6 +118,27 @@ export class SyncDebtDto {
   @IsOptional() @IsISO8601() deletedAt?: string;
 }
 
+export class SyncAssistantThreadDto {
+  @IsUUID() id!: string;
+  @IsOptional() @IsString() title?: string | null;
+  @IsOptional() @IsString() sessionDate?: string | null;
+  @IsISO8601() createdAt!: string;
+  @IsISO8601() updatedAt!: string;
+  @IsOptional() @IsISO8601() deletedAt?: string;
+}
+
+export class SyncAssistantMessageDto {
+  @IsUUID() id!: string;
+  @IsUUID() threadId!: string;
+  @IsIn(['user', 'assistant', 'system']) role!: 'user' | 'assistant' | 'system';
+  @IsString() content!: string;
+  @IsOptional() @IsUUID() clientMessageId?: string | null;
+  @IsOptional() @IsObject() metadata?: Record<string, unknown> | null;
+  @IsISO8601() createdAt!: string;
+  @IsISO8601() updatedAt!: string;
+  @IsOptional() @IsISO8601() deletedAt?: string;
+}
+
 export class SyncPushDto {
   @IsString() deviceId!: string;
   @IsISO8601() pushedAt!: string;
@@ -168,4 +190,16 @@ export class SyncPushDto {
   @Type(() => SyncDebtDto)
   @IsOptional()
   debts?: SyncDebtDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SyncAssistantThreadDto)
+  @IsOptional()
+  assistantThreads?: SyncAssistantThreadDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SyncAssistantMessageDto)
+  @IsOptional()
+  assistantMessages?: SyncAssistantMessageDto[];
 }

@@ -12,7 +12,12 @@ export class SyncController {
   }
 
   @Get('pull')
-  pull(@Query('since') since?: string) {
-    return this.syncService.pull(since);
+  pull(
+    @Query('since') since?: string,
+    @Query('entity') entity?: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.syncService.pull(since, entity, limit, cursor);
   }
 }

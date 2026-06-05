@@ -18,6 +18,17 @@ import { HabitsService } from './habits.service';
 export class HabitsController {
   constructor(private readonly habitsService: HabitsService) {}
 
+  @Get('check-ins')
+  listCheckInsGlobal(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('habitId') habitId?: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.habitsService.listCheckInsGlobal(from, to, habitId, limit, cursor);
+  }
+
   @Get()
   list(@Query('active') active?: string) {
     const activeOnly = active !== 'false';

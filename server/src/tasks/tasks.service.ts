@@ -1,6 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import {
+  buildPaginatedResult,
+  clampLimit,
+  cursorFilter,
+} from '../common/pagination/cursor.util';
+import { upsertByClientId } from '../common/mongo/client-id-upsert';
 import { mapDoc, mapDocs } from '../database/document.util';
 import { Task, TaskDocument } from '../database/schemas/task.schema';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -14,11 +20,15 @@ export class TasksService {
 
   async list(
     status?: string,
+    excludeStatus?: string,
     scheduledFrom?: string,
     scheduledTo?: string,
+    limit?: string,
+    cursor?: string,
   ) {
     const filter: Record<string, unknown> = { deletedAt: null };
     if (status) filter.status = status;
+    if (excludeStatus) filter.status = { $ne: excludeStatus };
     if (scheduledFrom || scheduledTo) {
       filter.scheduledAt = {};
       if (scheduledFrom) {
@@ -28,8 +38,27 @@ export class TasksService {
         (filter.scheduledAt as Record<string, Date>).$lte = new Date(scheduledTo);
       }
     }
+    const pageLimit = clampLimit(limit);
+    if (cursor || limit) {
+      const docs = await this.taskModel
+        .find(cursorFilter(filter, cursor))
+        .sort({ updatedAt: 1, _id: 1 })
+        .limit(pageLimit + 1)
+        .exec();
+      const mapped = mapDocs(docs);
+      return buildPaginatedResult(
+        mapped,
+        pageLimit,
+        (i) => i.id as string,
+        (i) => new Date(i.updatedAt as string),
+      );
+    }
     const items = await this.taskModel.find(filter).sort({ sortOrder: 1, scheduledAt: 1 }).exec();
-    return { items: mapDocs(items) };
+    return {
+      items: mapDocs(items),
+      nextCursor: null,
+      serverTime: new Date().toISOString(),
+    };
   }
 
   async findOne(id: string) {
@@ -44,24 +73,33 @@ export class TasksService {
   }
 
   async create(dto: CreateTaskDto) {
-    const doc = await this.taskModel.create({
-      _id: dto.id,
-      title: dto.title,
-      notes: dto.notes ?? null,
-      scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
-      durationMinutes: dto.durationMinutes ?? null,
-      status: dto.status,
-      sortOrder: dto.sortOrder ?? 0,
-      priority: dto.priority ?? null,
-      createdAt: new Date(dto.createdAt),
-      updatedAt: new Date(dto.updatedAt),
-      deletedAt: dto.deletedAt ? new Date(dto.deletedAt) : null,
-    });
+    const doc = await upsertByClientId(
+      this.taskModel,
+      dto.id,
+      {
+        title: dto.title,
+        notes: dto.notes ?? null,
+        scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
+        durationMinutes: dto.durationMinutes ?? null,
+        status: dto.status,
+        sortOrder: dto.sortOrder ?? 0,
+        priority: dto.priority ?? null,
+        updatedAt: new Date(dto.updatedAt),
+        deletedAt: dto.deletedAt ? new Date(dto.deletedAt) : null,
+      },
+      new Date(dto.createdAt),
+    );
     return mapDoc(doc)!;
   }
 
   async update(id: string, dto: UpdateTaskDto) {
-    await this.findOne(id);
+    const existing = await this.taskModel.findById(id).exec();
+    if (!existing) {
+      throw new NotFoundException({
+        code: 'TASK_NOT_FOUND',
+        message: `Task ${id} not found`,
+      });
+    }
     const doc = await this.taskModel
       .findOneAndUpdate(
         { _id: id },
@@ -91,7 +129,13 @@ export class TasksService {
   }
 
   async remove(id: string): Promise<void> {
-    await this.findOne(id);
+    const existing = await this.taskModel.findById(id).exec();
+    if (!existing) {
+      throw new NotFoundException({
+        code: 'TASK_NOT_FOUND',
+        message: `Task ${id} not found`,
+      });
+    }
     await this.taskModel
       .updateOne({ _id: id }, { deletedAt: new Date(), updatedAt: new Date() })
       .exec();

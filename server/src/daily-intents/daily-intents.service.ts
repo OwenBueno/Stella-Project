@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { upsertByNaturalKey } from '../common/mongo/client-id-upsert';
 import { mapDoc } from '../database/document.util';
 import { DailyIntent, DailyIntentDocument } from '../database/schemas/daily-intent.schema';
 import { CreateDailyIntentDto } from './dto/create-daily-intent.dto';
@@ -19,20 +20,20 @@ export class DailyIntentsService {
   }
 
   async upsert(dto: CreateDailyIntentDto) {
-    const doc = await this.dailyIntentModel
-      .findOneAndUpdate(
-        { date: dto.date },
-        {
-          _id: dto.id,
-          date: dto.date,
-          plannedTaskIds: dto.plannedTaskIds,
-          completedAt: new Date(dto.completedAt),
-          nfcTagId: dto.nfcTagId,
-          updatedAt: new Date(dto.updatedAt),
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true },
-      )
-      .exec();
+    const doc = await upsertByNaturalKey(
+      this.dailyIntentModel,
+      { date: dto.date },
+      {
+        plannedTaskIds: dto.plannedTaskIds,
+        completedAt: new Date(dto.completedAt),
+        nfcTagId: dto.nfcTagId,
+        updatedAt: new Date(dto.updatedAt),
+      },
+      {
+        _id: dto.id,
+        date: dto.date,
+      },
+    );
     return mapDoc(doc)!;
   }
 }

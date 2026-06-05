@@ -8,7 +8,11 @@ export * from './life-log.schema';
 export * from './device-token.schema';
 export * from './transaction.schema';
 export * from './debt.schema';
+export * from './assistant-thread.schema';
+export * from './assistant-message.schema';
 
+import { AssistantMessage, AssistantMessageSchema } from './assistant-message.schema';
+import { AssistantThread, AssistantThreadSchema } from './assistant-thread.schema';
 import { CalendarEvent, CalendarEventSchema } from './calendar-event.schema';
 import { DailyIntent, DailyIntentSchema } from './daily-intent.schema';
 import { Debt, DebtSchema } from './debt.schema';
@@ -31,4 +35,6 @@ export const stellaModels = [
   { name: DeviceToken.name, schema: DeviceTokenSchema },
   { name: Transaction.name, schema: TransactionSchema },
   { name: Debt.name, schema: DebtSchema },
+  { name: AssistantThread.name, schema: AssistantThreadSchema },
+  { name: AssistantMessage.name, schema: AssistantMessageSchema },
 ];

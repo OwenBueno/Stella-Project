@@ -2,6 +2,12 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { randomUUID } from 'crypto';
+import {
+  buildPaginatedResult,
+  clampLimit,
+  cursorFilter,
+} from '../common/pagination/cursor.util';
+import { upsertByClientId } from '../common/mongo/client-id-upsert';
 import { mapDoc, mapDocs } from '../database/document.util';
 import { Debt, DebtDocument } from '../database/schemas/debt.schema';
 import { Transaction, TransactionDocument } from '../database/schemas/transaction.schema';
@@ -21,6 +27,8 @@ export class FinancesService {
     category?: string,
     startDate?: string,
     endDate?: string,
+    limit?: string,
+    cursor?: string,
   ) {
     const filter: Record<string, unknown> = { deletedAt: null };
     if (type) filter.type = type;
@@ -34,26 +42,48 @@ export class FinancesService {
         (filter.date as Record<string, Date>).$lte = new Date(endDate);
       }
     }
+    const pageLimit = clampLimit(limit);
+    if (cursor || limit) {
+      const docs = await this.transactionModel
+        .find(cursorFilter(filter, cursor))
+        .sort({ updatedAt: 1, _id: 1 })
+        .limit(pageLimit + 1)
+        .exec();
+      const mapped = mapDocs(docs);
+      return buildPaginatedResult(
+        mapped,
+        pageLimit,
+        (i) => i.id as string,
+        (i) => new Date(i.updatedAt as string),
+      );
+    }
     const items = await this.transactionModel
       .find(filter)
       .sort({ date: -1 })
       .exec();
-    return { items: mapDocs(items) };
+    return {
+      items: mapDocs(items),
+      nextCursor: null,
+      serverTime: new Date().toISOString(),
+    };
   }
 
   async createTransaction(dto: CreateTransactionDto) {
-    const doc = await this.transactionModel.create({
-      _id: dto.id,
-      type: dto.type,
-      amount: dto.amount,
-      category: dto.category,
-      description: dto.description ?? null,
-      date: new Date(dto.date),
-      linkedTaskId: dto.linkedTaskId ?? null,
-      createdAt: new Date(dto.createdAt),
-      updatedAt: new Date(dto.updatedAt),
-      deletedAt: null,
-    });
+    const doc = await upsertByClientId(
+      this.transactionModel,
+      dto.id,
+      {
+        type: dto.type,
+        amount: dto.amount,
+        category: dto.category,
+        description: dto.description ?? null,
+        date: new Date(dto.date),
+        linkedTaskId: dto.linkedTaskId ?? null,
+        updatedAt: new Date(dto.updatedAt),
+        deletedAt: null,
+      },
+      new Date(dto.createdAt),
+    );
     return mapDoc(doc)!;
   }
 
@@ -75,28 +105,50 @@ export class FinancesService {
     return mapDoc(doc)!;
   }
 
-  async listDebts(resolved?: string) {
+  async listDebts(resolved?: string, limit?: string, cursor?: string) {
     const filter: Record<string, unknown> = { deletedAt: null };
     if (resolved === 'true') filter.isResolved = true;
     else if (resolved === 'false') filter.isResolved = false;
+    const pageLimit = clampLimit(limit);
+    if (cursor || limit) {
+      const docs = await this.debtModel
+        .find(cursorFilter(filter, cursor))
+        .sort({ updatedAt: 1, _id: 1 })
+        .limit(pageLimit + 1)
+        .exec();
+      const mapped = mapDocs(docs);
+      return buildPaginatedResult(
+        mapped,
+        pageLimit,
+        (i) => i.id as string,
+        (i) => new Date(i.updatedAt as string),
+      );
+    }
     const items = await this.debtModel.find(filter).sort({ updatedAt: -1 }).exec();
-    return { items: mapDocs(items) };
+    return {
+      items: mapDocs(items),
+      nextCursor: null,
+      serverTime: new Date().toISOString(),
+    };
   }
 
   async createDebt(dto: CreateDebtDto) {
-    const doc = await this.debtModel.create({
-      _id: dto.id,
-      contactName: dto.contactName,
-      direction: dto.direction,
-      totalAmount: dto.totalAmount,
-      remainingAmount: dto.totalAmount,
-      dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
-      notes: dto.notes ?? null,
-      isResolved: false,
-      createdAt: new Date(dto.createdAt),
-      updatedAt: new Date(dto.updatedAt),
-      deletedAt: null,
-    });
+    const doc = await upsertByClientId(
+      this.debtModel,
+      dto.id,
+      {
+        contactName: dto.contactName,
+        direction: dto.direction,
+        totalAmount: dto.totalAmount,
+        remainingAmount: dto.totalAmount,
+        dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
+        notes: dto.notes ?? null,
+        isResolved: false,
+        updatedAt: new Date(dto.updatedAt),
+        deletedAt: null,
+      },
+      new Date(dto.createdAt),
+    );
     return mapDoc(doc)!;
   }
 

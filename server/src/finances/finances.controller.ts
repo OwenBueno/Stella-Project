@@ -18,8 +18,17 @@ export class FinancesController {
     @Query('category') category?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
   ) {
-    return this.financesService.listTransactions(type, category, startDate, endDate);
+    return this.financesService.listTransactions(
+      type,
+      category,
+      startDate,
+      endDate,
+      limit,
+      cursor,
+    );
   }
 
   @Post('debts')
@@ -33,8 +42,12 @@ export class FinancesController {
   }
 
   @Get('debts')
-  listDebts(@Query('resolved') resolved?: string) {
-    return this.financesService.listDebts(resolved);
+  listDebts(
+    @Query('resolved') resolved?: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.financesService.listDebts(resolved, limit, cursor);
   }
 
   @Get('summary')

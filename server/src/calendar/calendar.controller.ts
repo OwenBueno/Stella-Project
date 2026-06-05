@@ -18,8 +18,13 @@ export class CalendarController {
   constructor(private readonly calendarService: CalendarService) {}
 
   @Get()
-  list(@Query('from') from?: string, @Query('to') to?: string) {
-    return this.calendarService.list(from, to);
+  list(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.calendarService.list(from, to, limit, cursor);
   }
 
   @Post()

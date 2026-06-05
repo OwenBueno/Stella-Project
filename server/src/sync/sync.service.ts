@@ -11,8 +11,23 @@ import { LifeLog, LifeLogDocument } from '../database/schemas/life-log.schema';
 import { Task, TaskDocument } from '../database/schemas/task.schema';
 import { Transaction, TransactionDocument } from '../database/schemas/transaction.schema';
 import { Debt, DebtDocument } from '../database/schemas/debt.schema';
+import {
+  AssistantMessage,
+  AssistantMessageDocument,
+} from '../database/schemas/assistant-message.schema';
+import {
+  AssistantThread,
+  AssistantThreadDocument,
+} from '../database/schemas/assistant-thread.schema';
+import {
+  buildPaginatedResult,
+  clampLimit,
+  cursorFilter,
+} from '../common/pagination/cursor.util';
 import { isIncomingNewer } from '../common/sync/lww.util';
 import {
+  SyncAssistantMessageDto,
+  SyncAssistantThreadDto,
   SyncCheckInDto,
   SyncDailyIntentDto,
   SyncDebtDto,
@@ -42,6 +57,10 @@ export class SyncService {
     @InjectModel(Transaction.name)
     private readonly transactionModel: Model<TransactionDocument>,
     @InjectModel(Debt.name) private readonly debtModel: Model<DebtDocument>,
+    @InjectModel(AssistantThread.name)
+    private readonly assistantThreadModel: Model<AssistantThreadDocument>,
+    @InjectModel(AssistantMessage.name)
+    private readonly assistantMessageModel: Model<AssistantMessageDocument>,
   ) {}
 
   async push(dto: SyncPushDto) {
@@ -105,26 +124,68 @@ export class SyncService {
       else if (result.conflict) conflicts.push(result.conflict);
     }
 
+    for (const thread of dto.assistantThreads ?? []) {
+      const result = await this.upsertAssistantThread(thread);
+      if (result === 'accepted') accepted++;
+      else if (result.conflict) conflicts.push(result.conflict);
+    }
+
+    for (const message of dto.assistantMessages ?? []) {
+      const result = await this.upsertAssistantMessage(message);
+      if (result === 'accepted') accepted++;
+      else if (result.conflict) conflicts.push(result.conflict);
+    }
+
     return { accepted, conflicts };
   }
 
-  async pull(since?: string) {
+  private static readonly SYNC_ENTITIES = [
+    'habits',
+    'habitCheckIns',
+    'tasks',
+    'events',
+    'dailyIntents',
+    'eveningReviews',
+    'lifeLogs',
+    'transactions',
+    'debts',
+    'assistantThreads',
+    'assistantMessages',
+  ] as const;
+
+  async pull(since?: string, entity?: string, limit?: string, cursor?: string) {
+    if (entity) {
+      return this.pullEntity(since, entity, limit, cursor);
+    }
     const sinceDate = since ? new Date(since) : new Date(0);
     const serverTime = new Date().toISOString();
     const filter = { updatedAt: { $gt: sinceDate } };
 
-    const [habits, habitCheckIns, tasks, events, dailyIntents, eveningReviews, lifeLogs, transactions, debts] =
-      await Promise.all([
-        this.habitModel.find(filter).exec(),
-        this.checkInModel.find(filter).exec(),
-        this.taskModel.find(filter).exec(),
-        this.eventModel.find(filter).exec(),
-        this.dailyIntentModel.find(filter).exec(),
-        this.eveningReviewModel.find(filter).exec(),
-        this.lifeLogModel.find(filter).exec(),
-        this.transactionModel.find(filter).exec(),
-        this.debtModel.find(filter).exec(),
-      ]);
+    const [
+      habits,
+      habitCheckIns,
+      tasks,
+      events,
+      dailyIntents,
+      eveningReviews,
+      lifeLogs,
+      transactions,
+      debts,
+      assistantThreads,
+      assistantMessages,
+    ] = await Promise.all([
+      this.habitModel.find(filter).exec(),
+      this.checkInModel.find(filter).exec(),
+      this.taskModel.find(filter).exec(),
+      this.eventModel.find(filter).exec(),
+      this.dailyIntentModel.find(filter).exec(),
+      this.eveningReviewModel.find(filter).exec(),
+      this.lifeLogModel.find(filter).exec(),
+      this.transactionModel.find(filter).exec(),
+      this.debtModel.find(filter).exec(),
+      this.assistantThreadModel.find(filter).exec(),
+      this.assistantMessageModel.find(filter).exec(),
+    ]);
 
     return {
       serverTime,
@@ -134,10 +195,104 @@ export class SyncService {
       events: mapDocs(events),
       dailyIntents: mapDocs(dailyIntents),
       eveningReviews: mapDocs(eveningReviews),
-      lifeLogs: mapDocs(lifeLogs),
+      lifeLogs: mapDocs(lifeLogs).map((log) => this.mapLifeLogForSync(log)),
       transactions: mapDocs(transactions),
       debts: mapDocs(debts),
+      assistantThreads: mapDocs(assistantThreads),
+      assistantMessages: mapDocs(assistantMessages),
+      nextCursor: null,
+      hasMore: false,
     };
+  }
+
+  private async pullEntity(
+    since: string | undefined,
+    entity: string,
+    limit?: string,
+    cursor?: string,
+  ) {
+    if (!SyncService.SYNC_ENTITIES.includes(entity as (typeof SyncService.SYNC_ENTITIES)[number])) {
+      return {
+        serverTime: new Date().toISOString(),
+        entity,
+        items: [],
+        nextCursor: null,
+        hasMore: false,
+      };
+    }
+    const sinceDate = since ? new Date(since) : new Date(0);
+    const baseFilter = { updatedAt: { $gt: sinceDate } };
+    const pageLimit = clampLimit(limit);
+    const filter = cursorFilter(baseFilter, cursor);
+
+    const docs = await this.findEntityPage(entity, filter, pageLimit + 1);
+    let mapped = mapDocs(docs);
+    if (entity === 'lifeLogs') {
+      mapped = mapped.map((log) => this.mapLifeLogForSync(log));
+    }
+    const page = buildPaginatedResult(
+      mapped,
+      pageLimit,
+      (i) => i.id as string,
+      (i) => new Date(i.updatedAt as string),
+    );
+    return {
+      serverTime: page.serverTime,
+      entity,
+      items: page.items,
+      nextCursor: page.nextCursor,
+      hasMore: page.nextCursor != null,
+    };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async findEntityPage(entity: string, filter: Record<string, unknown>, limit: number): Promise<any[]> {
+    const sort = { updatedAt: 1 as const, _id: 1 as const };
+    switch (entity) {
+      case 'habits':
+        return this.habitModel.find(filter).sort(sort).limit(limit).exec();
+      case 'habitCheckIns':
+        return this.checkInModel.find(filter).sort(sort).limit(limit).exec();
+      case 'tasks':
+        return this.taskModel.find(filter).sort(sort).limit(limit).exec();
+      case 'events':
+        return this.eventModel.find(filter).sort(sort).limit(limit).exec();
+      case 'dailyIntents':
+        return this.dailyIntentModel.find(filter).sort(sort).limit(limit).exec();
+      case 'eveningReviews':
+        return this.eveningReviewModel.find(filter).sort(sort).limit(limit).exec();
+      case 'lifeLogs':
+        return this.lifeLogModel.find(filter).sort(sort).limit(limit).exec();
+      case 'transactions':
+        return this.transactionModel.find(filter).sort(sort).limit(limit).exec();
+      case 'debts':
+        return this.debtModel.find(filter).sort(sort).limit(limit).exec();
+      case 'assistantThreads':
+        return this.assistantThreadModel.find(filter).sort(sort).limit(limit).exec();
+      case 'assistantMessages':
+        return this.assistantMessageModel.find(filter).sort(sort).limit(limit).exec();
+      default:
+        return [];
+    }
+  }
+
+  /** API contract: payload is a JSON string (Room / Retrofit), not a Mixed object. */
+  private mapLifeLogForSync(doc: Record<string, unknown>): Record<string, unknown> {
+    const timestamp = doc.timestamp;
+    const updatedAt = doc.updatedAt;
+    return {
+      ...doc,
+      payload: this.serializeLifeLogPayload(doc.payload),
+      timestamp:
+        timestamp instanceof Date ? timestamp.toISOString() : String(timestamp),
+      updatedAt:
+        updatedAt instanceof Date ? updatedAt.toISOString() : String(updatedAt),
+    };
+  }
+
+  private serializeLifeLogPayload(payload: unknown): string {
+    if (typeof payload === 'string') return payload;
+    return JSON.stringify(payload ?? {});
   }
 
   private async upsertHabit(
@@ -342,7 +497,11 @@ export class SyncService {
     const existing = await this.lifeLogModel.findById(dto.id).exec();
     if (existing && !isIncomingNewer(dto.updatedAt, existing.updatedAt)) {
       return {
-        conflict: { entity: 'lifeLog', id: dto.id, serverDocument: mapDoc(existing) },
+        conflict: {
+          entity: 'lifeLog',
+          id: dto.id,
+          serverDocument: this.mapLifeLogForSync(mapDoc(existing)!),
+        },
       };
     }
 
@@ -420,6 +579,75 @@ export class SyncService {
       await this.debtModel.updateOne({ _id: dto.id }, data).exec();
     } else {
       await this.debtModel.create({
+        _id: dto.id,
+        ...data,
+        createdAt: new Date(dto.createdAt),
+      });
+    }
+    return 'accepted';
+  }
+
+  private async upsertAssistantThread(
+    dto: SyncAssistantThreadDto,
+  ): Promise<'accepted' | { conflict: { entity: string; id: string; serverDocument: unknown } }> {
+    const existing = await this.assistantThreadModel.findById(dto.id).exec();
+    if (existing && !isIncomingNewer(dto.updatedAt, existing.updatedAt)) {
+      return {
+        conflict: {
+          entity: 'assistantThread',
+          id: dto.id,
+          serverDocument: mapDoc(existing),
+        },
+      };
+    }
+
+    const data = {
+      title: dto.title ?? null,
+      sessionDate: dto.sessionDate ?? null,
+      updatedAt: new Date(dto.updatedAt),
+      deletedAt: dto.deletedAt ? new Date(dto.deletedAt) : null,
+    };
+
+    if (existing) {
+      await this.assistantThreadModel.updateOne({ _id: dto.id }, data).exec();
+    } else {
+      await this.assistantThreadModel.create({
+        _id: dto.id,
+        ...data,
+        createdAt: new Date(dto.createdAt),
+      });
+    }
+    return 'accepted';
+  }
+
+  private async upsertAssistantMessage(
+    dto: SyncAssistantMessageDto,
+  ): Promise<'accepted' | { conflict: { entity: string; id: string; serverDocument: unknown } }> {
+    const existing = await this.assistantMessageModel.findById(dto.id).exec();
+    if (existing && !isIncomingNewer(dto.updatedAt, existing.updatedAt)) {
+      return {
+        conflict: {
+          entity: 'assistantMessage',
+          id: dto.id,
+          serverDocument: mapDoc(existing),
+        },
+      };
+    }
+
+    const data = {
+      threadId: dto.threadId,
+      role: dto.role,
+      content: dto.content,
+      clientMessageId: dto.clientMessageId ?? null,
+      metadata: dto.metadata ?? null,
+      updatedAt: new Date(dto.updatedAt),
+      deletedAt: dto.deletedAt ? new Date(dto.deletedAt) : null,
+    };
+
+    if (existing) {
+      await this.assistantMessageModel.updateOne({ _id: dto.id }, data).exec();
+    } else {
+      await this.assistantMessageModel.create({
         _id: dto.id,
         ...data,
         createdAt: new Date(dto.createdAt),

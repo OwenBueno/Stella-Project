@@ -20,10 +20,20 @@ export class TasksController {
   @Get()
   list(
     @Query('status') status?: string,
+    @Query('excludeStatus') excludeStatus?: string,
     @Query('scheduledFrom') scheduledFrom?: string,
     @Query('scheduledTo') scheduledTo?: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
   ) {
-    return this.tasksService.list(status, scheduledFrom, scheduledTo);
+    return this.tasksService.list(
+      status,
+      excludeStatus,
+      scheduledFrom,
+      scheduledTo,
+      limit,
+      cursor,
+    );
   }
 
   @Post()

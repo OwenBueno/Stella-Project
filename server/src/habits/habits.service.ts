@@ -1,6 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import {
+  buildPaginatedResult,
+  clampLimit,
+  cursorFilter,
+} from '../common/pagination/cursor.util';
+import { upsertByClientId, upsertByNaturalKey } from '../common/mongo/client-id-upsert';
 import { mapDoc, mapDocs } from '../database/document.util';
 import { Habit, HabitDocument } from '../database/schemas/habit.schema';
 import { HabitCheckIn, HabitCheckInDocument } from '../database/schemas/habit-check-in.schema';
@@ -21,19 +27,26 @@ export class HabitsService {
       ? { deletedAt: null, active: true }
       : { deletedAt: null };
     const items = await this.habitModel.find(filter).sort({ sortOrder: 1 }).exec();
-    return { items: mapDocs(items) };
+    return {
+      items: mapDocs(items),
+      nextCursor: null,
+      serverTime: new Date().toISOString(),
+    };
   }
 
   async create(dto: CreateHabitDto) {
-    const doc = await this.habitModel.create({
-      _id: dto.id,
-      name: dto.name,
-      sortOrder: dto.sortOrder,
-      active: dto.active ?? true,
-      createdAt: new Date(dto.createdAt),
-      updatedAt: new Date(dto.updatedAt),
-      deletedAt: dto.deletedAt ? new Date(dto.deletedAt) : null,
-    });
+    const doc = await upsertByClientId(
+      this.habitModel,
+      dto.id,
+      {
+        name: dto.name,
+        sortOrder: dto.sortOrder,
+        active: dto.active ?? true,
+        updatedAt: new Date(dto.updatedAt),
+        deletedAt: dto.deletedAt ? new Date(dto.deletedAt) : null,
+      },
+      new Date(dto.createdAt),
+    );
     return mapDoc(doc)!;
   }
 
@@ -68,49 +81,60 @@ export class HabitsService {
 
   async listCheckIns(habitId: string, from?: string, to?: string) {
     await this.ensureExists(habitId);
-    const filter: Record<string, unknown> = { habitId };
+    return this.listCheckInsGlobal(from, to, habitId);
+  }
+
+  async listCheckInsGlobal(
+    from?: string,
+    to?: string,
+    habitId?: string,
+    limit?: string,
+    cursor?: string,
+  ) {
+    const filter: Record<string, unknown> = {};
+    if (habitId) filter.habitId = habitId;
     if (from || to) {
       filter.date = {};
       if (from) (filter.date as Record<string, string>).$gte = from;
       if (to) (filter.date as Record<string, string>).$lte = to;
     }
-    const items = await this.checkInModel.find(filter).exec();
-    return { items: mapDocs(items) };
+    const pageLimit = clampLimit(limit);
+    const docs = await this.checkInModel
+      .find(cursorFilter(filter, cursor))
+      .sort({ updatedAt: 1, _id: 1 })
+      .limit(pageLimit + 1)
+      .exec();
+    const mapped = mapDocs(docs);
+    return buildPaginatedResult(
+      mapped,
+      pageLimit,
+      (i) => i.id as string,
+      (i) => new Date(i.updatedAt as string),
+    );
   }
 
   async upsertCheckIn(habitId: string, dto: UpsertCheckInDto) {
     await this.ensureExists(habitId);
-    const existing = await this.checkInModel
-      .findOne({ habitId, date: dto.date })
-      .exec();
     const completedAt =
       dto.status === 'DONE' && dto.completedAt
         ? new Date(dto.completedAt)
         : dto.status === 'DONE'
           ? new Date(dto.updatedAt)
           : null;
-    if (existing) {
-      const doc = await this.checkInModel
-        .findOneAndUpdate(
-          { _id: existing._id },
-          {
-            status: dto.status,
-            completedAt,
-            updatedAt: new Date(dto.updatedAt),
-          },
-          { new: true },
-        )
-        .exec();
-      return mapDoc(doc)!;
-    }
-    const doc = await this.checkInModel.create({
-      _id: dto.id,
-      habitId,
-      date: dto.date,
-      status: dto.status,
-      completedAt,
-      updatedAt: new Date(dto.updatedAt),
-    });
+    const doc = await upsertByNaturalKey(
+      this.checkInModel,
+      { habitId, date: dto.date },
+      {
+        status: dto.status,
+        completedAt,
+        updatedAt: new Date(dto.updatedAt),
+      },
+      {
+        _id: dto.id,
+        habitId,
+        date: dto.date,
+      },
+    );
     return mapDoc(doc)!;
   }
 
